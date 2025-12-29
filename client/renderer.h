@@ -2,11 +2,18 @@
 #define SERPENT_RENDERER_H
 
 #include <stdlib.h>
-#include "common/game_types.h"
-#include "client/types.h"
+#include "game.h"
+#include "menu.h"
+#include "context.h"
+
+typedef struct {
+    int cols;
+    int rows;
+} TermSize;
 
 
-void render_menu(const Menu *menu, InputMode input_mode, const char *text_note, const char *text_buffer, size_t text_len);
+void render_menu(const Menu *menu, InputMode input_mode, const char *text_note,
+    const char *text_buffer, size_t text_len);
 void render_game(const GameRenderState *state);
 
 void sleep_frame();

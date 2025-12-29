@@ -67,9 +67,9 @@ void draw_box(const int x, const int y, const int w, const int h) {
         draw_text(x + i, y,     "-");
         draw_text(x + i, y + h, "-");
     }
-    for (int i = 0; i < h; ++i) {
-        draw_text(x,     y + i, "|");
-        draw_text(x + w, y + i, "|");
+    for (int i = 0; i <= h; ++i) {
+        draw_text(x,     y + i, "-");
+        draw_text(x + w, y + i, "-");
     }
 }
 
@@ -109,7 +109,7 @@ void render_menu(const Menu *menu, const InputMode input_mode, const char *text_
     for (size_t i = 0; i < menu->txt_fields_count; ++i) {
         const TextField *t = &menu->txt_fields[i];
 
-        draw_text(ts.cols / 20, y_pos, t->text);
+        draw_text(ts.cols / 20, y_pos / 3, t->text);
     }
 
     fflush(stdout);
@@ -142,7 +142,6 @@ void render_game(const GameRenderState *state) {
         draw_text(18, 2, time_str);
     }
 
-    /*
     // draw fruits
     for (size_t i = 0; i < state->fruit_count; ++i) {
         Position fruit = state->fruits[i];
@@ -164,7 +163,7 @@ void render_game(const GameRenderState *state) {
             draw_text(body.x + 2, body.y + 2, SNAKE_CHAR);
         }
     }
-    */
+
 
     fflush(stdout);
 
