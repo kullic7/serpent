@@ -1,14 +1,42 @@
 #ifndef SERPENT_INPUT_H
 #define SERPENT_INPUT_H
 
-#include "client.h"
+#include "game.h"
+#include <pthread.h>
+#include "common/protocol.h"
 
-void read_input(ClientInputQueue *queue, const _Atomic bool *running);
+typedef size_t Key;
+typedef struct ClientInputQueue {
+    Key events[MAX_KEY_EVENTS];
+    size_t count;
+    pthread_mutex_t lock;
+} ClientInputQueue;
 
-void handle_menu_key(Menu *menu, Key key);
-void handle_game_key(Key key, ClientContext *ctx); // should map key to direction and send to server
+typedef struct ServerInputQueue {
+    Message events[MAX_MESSAGES];
+    size_t count;
+    pthread_mutex_t lock;
+    pthread_cond_t not_full;
+} ServerInputQueue;
 
-void enqueue_input(ClientInputQueue *queue, Key key);
-bool dequeue_input(ClientInputQueue *queue, Key *key);
+typedef struct {
+    ClientInputQueue *queue;
+    const _Atomic bool *running;
+} InputThreadArgs;
+
+void client_input_queue_init(ClientInputQueue *q);
+void client_input_queue_destroy(ClientInputQueue *q);
+
+void server_input_queue_init(ServerInputQueue *q);
+void server_input_queue_destroy(ServerInputQueue *q);
+
+void enqueue_key(ClientInputQueue *q, Key key);
+bool dequeue_key(ClientInputQueue *q, Key *key);
+
+void enqueue_msg(ServerInputQueue *q, Message msg);
+bool dequeue_msg(ServerInputQueue *q, Message *msg);
+
+void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running);
+inline void recv_msg(ServerInputQueue *q, Message *msg) {}; // receive message from server socket
 
 #endif //SERPENT_INPUT_H
