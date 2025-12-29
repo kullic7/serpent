@@ -29,7 +29,17 @@ void btn_exit_to_main_menu(void *ctx_ptr) {
 // main menu
 void btn_new_game(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    menu_push(&ctx->menus, &ctx->new_game_menu);
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->main_menu);
+    menu_push(&ctx->menus, &ctx->mode_select_menu);
+}
+
+void btn_connect_to_server(void *ctx_ptr) {
+    ClientContext *ctx = ctx_ptr;
+
+    setup_input(ctx, "Server address (socket path): ");
+
+    ctx->on_text_submit = on_socket_path_entered_when_joining;
 }
 
 void btn_exit_game(void *ctx_ptr) {
@@ -48,32 +58,17 @@ void btn_resume_game(void *ctx_ptr) {
 }
 
 
-// new game menu
-void btn_single_player(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-    ctx->game_mode = GAME_SINGLE;
-    menu_push(&ctx->menus, &ctx->mode_select_menu);
-}
-
-void btn_multiplayer(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-    ctx->game_mode = GAME_MULTI;
-    menu_push(&ctx->menus, &ctx->multiplayer_menu);
-}
-
 // mode select menu
 void btn_standard_mode(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    //ctx->game_config.time_limit = 10; TODO set othr config options
+    ctx->time_remaining = -1;
     menu_push(&ctx->menus, &ctx->world_select_menu);
 }
 
 void btn_time_mode(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
 
-    ctx->input_mode = INPUT_TEXT;
-    ctx->text_len = 0;
-    strncpy(ctx->text_note, "Time Limit (seconds): ", sizeof(ctx->text_note));
+    setup_input(ctx, "Time Limit (seconds): ");
 
     ctx->on_text_submit = on_time_entered;
 }
@@ -81,58 +76,89 @@ void btn_time_mode(void *ctx_ptr) {
 // world select menu
 void btn_easy_world_mode(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    //ctx->game_config.obstacles_enabled = false; TODO set other config options
+    ctx->obstacles_enabled = false;
+    menu_push(&ctx->menus, &ctx->player_select_menu);
 
-    spawn_create_join_server(ctx);
 }
 
 void btn_hard_world_mode(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    //ctx->game_config.obstacles_enabled = true; TODO set other config options
+    ctx->obstacles_enabled = true;
     menu_push(&ctx->menus, &ctx->load_menu);
 }
 
-// multiplayer menu
-void btn_connect_to_server(void *ctx_ptr) {
+
+// player select menu
+void btn_single_player(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
+    ctx->game_mode = GAME_SINGLE;
 
-    ctx->input_mode = INPUT_TEXT;
-    ctx->text_len = 0;
-    strncpy(ctx->text_note, "Server address (socket path): ", sizeof(ctx->text_note));
+    strncpy(ctx->server_path, "/tmp/serpent_single_player.sock", sizeof(ctx->server_path));
 
-    ctx->on_text_submit = on_socket_path_entered;
+
+    if (!spawn_connect_create_server(ctx)) {
+        ctx->mode = CLIENT_MENU;
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->awaiting_menu); // todo add error menu
+        return;
+    }
+
+    // TODO this is just for testing, should be after server confirmation
+    ctx->mode = CLIENT_PLAYING;
+
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->awaiting_menu);
 }
 
+void btn_multiplayer(void *ctx_ptr) {
+    ClientContext *ctx = ctx_ptr;
+    ctx->game_mode = GAME_MULTI;
+
+    setup_input(ctx, "Server address (socket path): ");
+
+    ctx->on_text_submit = on_socket_path_entered_when_creating;
+
+}
+
+
+/*
+void btn_join_game(void *ctx_ptr) {
+    ClientContext *ctx = ctx_ptr;
+    ctx->mode = CLIENT_MENU;
+
+    //send_msg(MSG_JOIN); TODO send join request to server
+
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->awaiting_menu);
+}
+*/
+
+/*
 void btn_create_game(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
+
+    setup_input(ctx, "Server address (socket path): ");
+
+    ctx->on_text_submit = on_socket_path_entered_when_joining;
+
     menu_push(&ctx->menus, &ctx->mode_select_menu);
 }
+*/
 
 // load menu
 void btn_random_world(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    random_world(ctx);
-
-    spawn_create_join_server(ctx);
+    ctx->random_world_enabled = true;
+    menu_push(&ctx->menus, &ctx->player_select_menu);
 }
 
 void btn_load_from_file(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
 
-    ctx->input_mode = INPUT_TEXT;
-    ctx->text_len = 0;
-    strncpy(ctx->text_note, "Load file path: ", sizeof(ctx->text_note));
+    setup_input(ctx, "Load file path: ");
 
     ctx->on_text_submit = on_input_file_entered;
-}
 
-// after multiplayer create game menu
-void btn_join_game(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-    ctx->mode = CLIENT_MENU;
-    //send_msg(MSG_JOIN); TODO send join request to server
-    clear_menus_stack(&ctx->menus);
-    menu_push(&ctx->menus, &ctx->awaiting_menu);
 }
 
 // awaiting menu

@@ -18,19 +18,22 @@ static void init_menu_fields(Menu *menu, Button *buttons, size_t b_count,
 
 void init_main_menu(Menu *menu, ClientContext *ctx);
 void init_pause_menu(Menu *menu, ClientContext *ctx);
-void init_new_game_menu(Menu *menu, ClientContext *ctx);
+//void init_new_game_menu(Menu *menu, ClientContext *ctx);
 
-void init_multiplayer_menu(Menu *menu, ClientContext *ctx);
+//void init_multiplayer_menu(Menu *menu, ClientContext *ctx);
 
 void init_mode_select_menu(Menu *menu, ClientContext *ctx);
 void init_world_select_menu(Menu *menu, ClientContext *ctx);
-void init_connect_menu(Menu *menu, ClientContext *ctx);
+void init_load_menu(Menu *menu, ClientContext *ctx);
+void init_player_select_menu(Menu *menu, ClientContext *ctx);
+
+//void init_connect_menu(Menu *menu, ClientContext *ctx);
 void init_game_over_menu(Menu *menu, ClientContext *ctx);
 
-void init_load_menu(Menu *menu, ClientContext *ctx);
+
 
 void init_awaiting_menu(Menu *menu, ClientContext *ctx);
-void init_join_menu(Menu *menu, ClientContext *ctx);
+//void init_join_menu(Menu *menu, ClientContext *ctx);
 
 // input handlers
 void handle_menu_key(Menu *menu, Key key); // should modify only menu subctx

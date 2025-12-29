@@ -5,47 +5,7 @@
 #include "game.h"
 
 //------------------------
-/*
-typedef struct {
-    int socket_fd;
-    char server_path[512];
-    volatile bool running;
-} NetworkState;
 
-typedef struct {
-    InputMode mode;
-    char note[128];
-    char buffer[128];
-    size_t len;
-    void (*on_submit)(void *ctx, const char *text);
-} InputState;
-
-typedef struct {
-    MenuStack stack;
-    Menu main_menu;
-    Menu new_game_menu;
-    Menu multiplayer_menu;
-    Menu mode_select_menu;
-    Menu world_select_menu;
-    Menu connect_menu;
-    Menu pause_menu;
-    Menu game_over_menu;
-} MenuState;
-
-typedef struct {
-    int score;
-    GameRenderState render;
-} GameState;
-
-// single source of truth for client state
-typedef struct {
-    NetworkState net;
-    InputState input;
-    MenuState menus;
-    GameState game;
-    ClientMode mode;
-} ClientContext;
-*/
 
 typedef enum {
     CLIENT_MENU, // all menus except pause
@@ -73,9 +33,11 @@ typedef enum {
 typedef struct {
     int socket_fd;  // socket file descriptor (unix domain sockets allow full duplex byte stream)
     char server_path[512]; // unix domain socket path
+
     volatile bool running;
     ClientMode mode;
 
+    // input state
     InputMode input_mode;
     char text_note[128];
     char text_buffer[128];
@@ -83,6 +45,49 @@ typedef struct {
     void (*on_text_submit)(void *ctx, const char *text);
 
     MenuStack menus;
+
+    Menu main_menu;
+    //Menu new_game_menu;
+    //Menu multiplayer_menu;
+    Menu mode_select_menu;
+    Menu world_select_menu;
+    Menu load_menu;
+    Menu player_select_menu;
+    Menu pause_menu;
+    Menu game_over_menu;
+    Menu awaiting_menu;
+    //Menu join_menu;
+
+    // current game state/rendering
+    GameRenderState game;
+    int score;
+
+    // game configuration options
+    int time_remaining; // in seconds, -1 means no limit
+    GameMode game_mode;
+    char file_path[128];
+    bool obstacles_enabled; // for hard world
+    bool random_world_enabled; // random | from file
+
+} ClientContext;
+
+// --------------
+/*
+typedef struct {
+    int socket_fd;
+    char server_path[512];
+} NetworkState;
+
+typedef struct {
+    InputMode mode;
+    char note[128];
+    char buffer[128];
+    size_t len;
+    void (*on_submit)(void *ctx, const char *text);
+} InputState;
+
+typedef struct {
+    MenuStack stack;
 
     Menu main_menu;
     Menu new_game_menu;
@@ -94,29 +99,48 @@ typedef struct {
     Menu game_over_menu;
     Menu awaiting_menu;
     Menu join_menu;
+} MenuState;
 
-    GameRenderState game;
+typedef struct {
     int score;
+    GameRenderState render;
+} GameState;
+
+typedef struct {
+    volatile bool running;
+    GameMode mode;
     int time_remaining; // in seconds, -1 means no limit
-    GameMode game_mode;
+    char file_path[128];
+} GameConfig;
 
-} ClientContext;
-
+// single source of truth for client state
+typedef struct {
+    NetworkState net;
+    InputState input;
+    MenuState menus;
+    GameState game;
+    ClientMode mode;
+    GameConfig config;
+} ClientContext2;
+*/
 
 // helpers
-void connect_to_server(ClientContext *ctx); // should modify just net subctx
+bool connect_to_server(ClientContext *ctx); // should modify just net subctx
+bool wait_for_server_socket(const char *path, int timeout_ms);
 void disconnect_from_server(ClientContext *ctx); // should modify just net subctx
 
-void spawn_create_join_server(ClientContext *ctx); // should modify just net subctx
+bool spawn_connect_create_server(ClientContext *ctx); // should modify just net subctx
 
-void spawn_server_process_if_needed(ClientContext *ctx); // should modify just net subctx
+int spawn_server_process(ClientContext *ctx); // should modify just net subctx
+
+void setup_input(ClientContext *ctx, const char *note);
 
 void load_from_file(ClientContext *ctx, const char *file_path); // pushes menu
 void save_to_file(ClientContext *ctx, const char *file_path); // uses game sub
-void random_world(ClientContext *ctx); // uses game sub
 
 void on_time_entered(void *ctx_ptr, const char *text); // pushes menu
-void on_socket_path_entered(void *ctx_ptr, const char *path); // uses modifies net and mode
+void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path); // uses modifies net and mode
+void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path); // uses modifies net and mode
 void on_input_file_entered(void *ctx_ptr, const char *file_path); // uses game sub and pushes menu
 
 // low level event(msg) callbacks

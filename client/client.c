@@ -19,7 +19,7 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
                 continue;
             }
 
-            if (ctx->mode == CLIENT_MENU || ctx->mode == CLIENT_PAUSED) {
+            if (ctx->mode == CLIENT_MENU || ctx->mode == CLIENT_PAUSED || ctx->mode == CLIENT_GAME_OVER) {
                 Menu *menu = menu_current(&ctx->menus);
                 handle_menu_key(menu, key);
             }
@@ -73,15 +73,16 @@ void client_init(ClientContext *ctx) {
 
     // todo probably explicit menu is not needed, can be selected from ctx
     init_main_menu(&ctx->main_menu, ctx);
-    init_new_game_menu(&ctx->new_game_menu, ctx);
-    init_multiplayer_menu(&ctx->multiplayer_menu, ctx);
+    //init_new_game_menu(&ctx->new_game_menu, ctx);
+    //init_multiplayer_menu(&ctx->multiplayer_menu, ctx);
     init_pause_menu(&ctx->pause_menu, ctx);
     init_mode_select_menu(&ctx->mode_select_menu, ctx);
     init_world_select_menu(&ctx->world_select_menu, ctx);
+    init_player_select_menu(&ctx->player_select_menu, ctx);
     init_load_menu(&ctx->load_menu, ctx);
     init_game_over_menu(&ctx->game_over_menu, ctx);
     init_awaiting_menu(&ctx->awaiting_menu, ctx);
-    init_join_menu(&ctx->join_menu, ctx);
+    //init_join_menu(&ctx->join_menu, ctx);
 
     init_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->main_menu);
@@ -108,13 +109,19 @@ void init_main_menu(Menu *menu, ClientContext *ctx) {
             .user_data = NULL
         },
         {
+            .text = "Join Game",
+            //.on_press = btn_new_game,
+            .on_press = btn_connect_to_server,
+            .user_data = NULL
+        },
+        {
             .text = "Exit Game",
             .on_press = btn_exit_game,
             .user_data = NULL
         }
     };
 
-    init_menu_fields(menu, buttons, 2, NULL, 0, ctx);
+    init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
 }
 
 
@@ -141,6 +148,7 @@ void init_pause_menu(Menu *menu, ClientContext *ctx) {
     init_menu_fields(menu, buttons, 2, txt_fields, 1, ctx);
 }
 
+/*
 void init_new_game_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
         {
@@ -162,6 +170,7 @@ void init_new_game_menu(Menu *menu, ClientContext *ctx) {
 
     init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
 }
+*/
 
 void init_mode_select_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
@@ -191,7 +200,7 @@ void init_mode_select_menu(Menu *menu, ClientContext *ctx) {
     init_menu_fields(menu, buttons, 3, txt_fields, 1, ctx);
 }
 
-
+/*
 void init_multiplayer_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
         {
@@ -199,6 +208,7 @@ void init_multiplayer_menu(Menu *menu, ClientContext *ctx) {
             .on_press = btn_create_game,
             .user_data = NULL
         },
+
         {
             .text = "Connect to Server",
             .on_press = btn_connect_to_server,
@@ -213,17 +223,17 @@ void init_multiplayer_menu(Menu *menu, ClientContext *ctx) {
 
     init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
 }
-
+*/
 
 void init_world_select_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
         {
-            .text = "Easy Mode",
+            .text = "Easy World",
             .on_press = btn_easy_world_mode,
             .user_data = NULL
         },
         {
-            .text = "Hard Mode", // with obstacles
+            .text = "Hard World", // with obstacles
             .on_press = btn_hard_world_mode,
             .user_data = NULL
         },
@@ -265,6 +275,34 @@ void init_load_menu(Menu *menu, ClientContext *ctx) {
     static TextField txt_fields[] = {
         {
             .text = "Select world load method.",
+        }
+    };
+
+    init_menu_fields(menu, buttons, 3, txt_fields, 1, ctx);
+}
+
+void init_player_select_menu(Menu *menu, ClientContext *ctx) {
+    static Button buttons[] = {
+        {
+            .text = "For One",
+            .on_press = btn_single_player,
+            .user_data = NULL
+        },
+        {
+            .text = "For Many",
+            .on_press = btn_multiplayer,
+            .user_data = NULL
+        },
+        {
+            .text = "Back",
+            .on_press = btn_back_in_menu,
+            .user_data = NULL
+        },
+    };
+
+    static TextField txt_fields[] = {
+        {
+            .text = "Select num. of players.",
         }
     };
 
@@ -313,13 +351,14 @@ void init_awaiting_menu(Menu *menu, ClientContext *ctx) {
 
     static TextField txt_fields[] = {
         {
-            .text = "Awaiting server. Please wait...", // for awaiting message
+            .text = "Awaiting server...", // for awaiting message
         }
     };
 
     init_menu_fields(menu, buttons, 1, txt_fields, 1, ctx);
 }
 
+/*
 void init_join_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
         {
@@ -347,6 +386,7 @@ void init_join_menu(Menu *menu, ClientContext *ctx) {
 
     init_menu_fields(menu, buttons, 3, txt_fields, 1, ctx);
 }
+*/
 
 static void init_menu_fields(Menu *menu, Button *buttons, size_t b_count,
     TextField *txt_fields, size_t t_count, ClientContext *ctx) {
@@ -417,7 +457,9 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
             on_game_over(ctx);
             break;
         case MSG_STATE:
-            ctx->mode = CLIENT_PLAYING;
+            // ctx->mode = CLIENT_PLAYING; here we cannot adjust mode otherwise pause won't work
+            // todo update game state from payload
+            int i;
             break;
         default:
             break;

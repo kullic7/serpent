@@ -20,12 +20,10 @@ void btn_easy_world_mode(void *ctx_ptr);
 void btn_hard_world_mode(void *ctx_ptr);
 
 void btn_connect_to_server(void *ctx_ptr);
-void btn_create_game(void *ctx_ptr);
 
 void btn_random_world(void *ctx_ptr);
 void btn_load_from_file(void *ctx_ptr);
 
-void btn_join_game(void *ctx_ptr);
 void btn_cancel_awaiting(void *ctx_ptr);
 
 #endif //SERPENT_ACTIONS_H
