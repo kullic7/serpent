@@ -1,8 +1,7 @@
-#ifndef SERPENT_TYPES_H
-#define SERPENT_TYPES_H
+#ifndef SERPENT_GAME_H
+#define SERPENT_GAME_H
 
-#include <pthread.h>
-#include "common/config.h"
+#include <stdio.h>
 #include "common/game_types.h"
 
 typedef struct {
@@ -23,4 +22,4 @@ typedef struct {
 } GameRenderState;
 
 
-#endif //SERPENT_TYPES_H
+#endif //SERPENT_GAME_H
