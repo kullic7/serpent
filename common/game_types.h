@@ -20,10 +20,7 @@ typedef struct {
 } Box;
 
 typedef struct {
-    Box box; // TODO probably simplification needed
-
     const char text[MENU_MAX_TEXT_LENGTH];
-
 } TextField;
 
 typedef enum {

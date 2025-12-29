@@ -5,7 +5,10 @@
 #define TICK_RATE 10  // Game updates per second
 #define INITIAL_SNAKE_LENGTH 3
 #define FRUIT_COUNT 5
+
 #define MAX_EVENTS 1024
+#define MAX_KEY_EVENTS 16
+#define MAX_MESSAGES 1024
 
 #define MENU_MAX_TEXT_LENGTH 64
 
@@ -30,6 +33,6 @@
 #define KEY_ENTER   '\n'
 #define KEY_ESC     '\x1b'
 
-#define MENU_STACK_MAX 8
+#define MENU_STACK_MAX 12
 
 #endif //SERPENT_CONFIG_H
