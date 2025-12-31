@@ -2,7 +2,7 @@
 #define SERPENT_GAME_H
 
 #include <stdio.h>
-#include "common/game_types.h"
+#include "game_types.h"
 
 typedef struct {
     int width;

@@ -1,7 +1,7 @@
 #include "client.h"
 #include "renderer.h"
 #include "actions.h"
-#include "common/protocol.h"
+#include "protocol.h"
 #include <string.h>
 #include <unistd.h>
 
@@ -26,6 +26,7 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
             else if (ctx->mode == CLIENT_PLAYING) {
                 handle_game_key(key, ctx);
             }
+            client_input_queue_flush(iq);
         }
 
         // async processing of server messages; when queue is full secondary thread waits
@@ -73,8 +74,6 @@ void client_init(ClientContext *ctx) {
 
     // todo probably explicit menu is not needed, can be selected from ctx
     init_main_menu(&ctx->main_menu, ctx);
-    //init_new_game_menu(&ctx->new_game_menu, ctx);
-    //init_multiplayer_menu(&ctx->multiplayer_menu, ctx);
     init_pause_menu(&ctx->pause_menu, ctx);
     init_mode_select_menu(&ctx->mode_select_menu, ctx);
     init_world_select_menu(&ctx->world_select_menu, ctx);
@@ -82,7 +81,7 @@ void client_init(ClientContext *ctx) {
     init_load_menu(&ctx->load_menu, ctx);
     init_game_over_menu(&ctx->game_over_menu, ctx);
     init_awaiting_menu(&ctx->awaiting_menu, ctx);
-    //init_join_menu(&ctx->join_menu, ctx);
+    init_error_menu(&ctx->error_menu, ctx);
 
     init_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->main_menu);
@@ -121,7 +120,7 @@ void init_main_menu(Menu *menu, ClientContext *ctx) {
         }
     };
 
-    init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
+    init_menu_fields(menu, buttons, LEN(buttons), NULL, 0, ctx);
 }
 
 
@@ -145,32 +144,28 @@ void init_pause_menu(Menu *menu, ClientContext *ctx) {
         }
     };
 
-    init_menu_fields(menu, buttons, 2, txt_fields, 1, ctx);
+    init_menu_fields(menu, buttons, LEN(buttons), txt_fields, LEN(txt_fields), ctx);
 }
 
-/*
-void init_new_game_menu(Menu *menu, ClientContext *ctx) {
+
+void init_error_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
         {
-            .text = "Single Player",
-            .on_press = btn_single_player,
+            .text = "Exit to Main Menu",
+            .on_press = btn_exit_to_main_menu,
             .user_data = NULL
-        },
-        {
-                .text = "Multi Player",
-                .on_press = btn_multiplayer,
-                .user_data = NULL
-            },
-            {
-                .text = "Back",
-                .on_press = btn_back_in_menu,
-                .user_data = NULL
-            }
+        }
     };
 
-    init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
+    static TextField txt_fields[] = {
+        {
+            .text = "", // for error message
+        }
+    };
+
+    init_menu_fields(menu, buttons, LEN(buttons), txt_fields, LEN(txt_fields), ctx);
 }
-*/
+
 
 void init_mode_select_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {
@@ -200,30 +195,6 @@ void init_mode_select_menu(Menu *menu, ClientContext *ctx) {
     init_menu_fields(menu, buttons, 3, txt_fields, 1, ctx);
 }
 
-/*
-void init_multiplayer_menu(Menu *menu, ClientContext *ctx) {
-    static Button buttons[] = {
-        {
-            .text = "Create Game",
-            .on_press = btn_create_game,
-            .user_data = NULL
-        },
-
-        {
-            .text = "Connect to Server",
-            .on_press = btn_connect_to_server,
-            .user_data = NULL
-        },
-        {
-            .text = "Back",
-            .on_press = btn_back_in_menu,
-            .user_data = NULL
-        }
-    };
-
-    init_menu_fields(menu, buttons, 3, NULL, 0, ctx);
-}
-*/
 
 void init_world_select_menu(Menu *menu, ClientContext *ctx) {
     static Button buttons[] = {

@@ -95,19 +95,19 @@ void btn_single_player(void *ctx_ptr) {
 
     strncpy(ctx->server_path, "/tmp/serpent_single_player.sock", sizeof(ctx->server_path));
 
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->awaiting_menu);
 
     if (!spawn_connect_create_server(ctx)) {
         ctx->mode = CLIENT_MENU;
         clear_menus_stack(&ctx->menus);
-        menu_push(&ctx->menus, &ctx->awaiting_menu); // todo add error menu
+        menu_push(&ctx->menus, &ctx->error_menu);
         return;
     }
 
     // TODO this is just for testing, should be after server confirmation
     ctx->mode = CLIENT_PLAYING;
 
-    clear_menus_stack(&ctx->menus);
-    menu_push(&ctx->menus, &ctx->awaiting_menu);
 }
 
 void btn_multiplayer(void *ctx_ptr) {
@@ -120,30 +120,6 @@ void btn_multiplayer(void *ctx_ptr) {
 
 }
 
-
-/*
-void btn_join_game(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-    ctx->mode = CLIENT_MENU;
-
-    //send_msg(MSG_JOIN); TODO send join request to server
-
-    clear_menus_stack(&ctx->menus);
-    menu_push(&ctx->menus, &ctx->awaiting_menu);
-}
-*/
-
-/*
-void btn_create_game(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-
-    setup_input(ctx, "Server address (socket path): ");
-
-    ctx->on_text_submit = on_socket_path_entered_when_joining;
-
-    menu_push(&ctx->menus, &ctx->mode_select_menu);
-}
-*/
 
 // load menu
 void btn_random_world(void *ctx_ptr) {

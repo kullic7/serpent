@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 199309L
-#include "common/config.h"
+#include "config.h"
 #include "renderer.h"
 #include <time.h>
 #include <stdio.h>

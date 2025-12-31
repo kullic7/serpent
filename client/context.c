@@ -6,13 +6,19 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <limits.h>
 
 #include "client.h"
 
 void on_time_entered(void *ctx_ptr, const char *text) {
-    const int seconds = strtol(text, NULL, 10);
+    char *endptr = NULL;
+    long seconds = strtol(text, &endptr, 10);
+    if (endptr == text || *endptr != '\0' || seconds < 0 || seconds > INT_MAX) {
+        // handle invalid input, e.g. set a default or show an error
+        return;
+    }
     ClientContext *ctx = ctx_ptr;
-    ctx->time_remaining = seconds; // TODO validation
+    ctx->time_remaining = (int)seconds; // TODO validation
 
     menu_push(&ctx->menus, &ctx->world_select_menu);
 }
@@ -25,7 +31,7 @@ void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path) {
     if (!spawn_connect_create_server(ctx)) {
         ctx->mode = CLIENT_MENU;
         clear_menus_stack(&ctx->menus);
-        menu_push(&ctx->menus, &ctx->awaiting_menu); // todo add error menu
+        menu_push(&ctx->menus, &ctx->error_menu);
         return;
     }
 
@@ -43,12 +49,12 @@ void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path) {
 
     if (!connect_to_server(ctx)) {
         ctx->mode = CLIENT_MENU;
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Could not connect to server.");
         clear_menus_stack(&ctx->menus);
-        menu_push(&ctx->menus, &ctx->awaiting_menu); // todo add error menu
+        menu_push(&ctx->menus, &ctx->error_menu);
         return;
     }
-
-    //send_msg(MSG_JOIN); TODO send join request to server
 
     // TODO this is just for testing, should be after server confirmation
     ctx->mode = CLIENT_PLAYING;
@@ -62,12 +68,9 @@ void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path) {
 void on_input_file_entered(void *ctx_ptr, const char *path) {
     ClientContext *ctx = ctx_ptr;
 
-    // load world from file
-    load_from_file(ctx, path);
+    strncpy(ctx->file_path, path, sizeof(ctx->file_path));
 
     menu_push(&ctx->menus, &ctx->player_select_menu);
-
-    //spawn_create_join_server(ctx);
 }
 
 
@@ -90,44 +93,65 @@ void on_game_ready(void *ctx_ptr) {
 // used by very first client to spawn server and connect to it
 // single or multi player
 bool spawn_connect_create_server(ClientContext *ctx) {
+
+    // check if socket file not already taken
+    if (wait_for_server_socket(ctx->server_path, 300)) {
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Socket address already taken. Use another.");
+        return false;
+    }
+
     if (!spawn_server_process(ctx)) {
-        // error handling (menu, message, etc.)
-        // show error menu TODO
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Spawning of server process failed.");
         return false;
     }
 
     if (!wait_for_server_socket(ctx->server_path, 3000)) {
-        // server failed to start
-        // show error menu TODO
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Server did not create socket in time.");
         return false;
     }
 
     if (!connect_to_server(ctx)) {
-        // could not connect
-        // show error menu  TODO
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Could not connect to server.");
         return false;
     }
 
-    // send_msg(MSG_CREATE);
     return true;
 
 }
 
-int spawn_server_process(ClientContext *ctx) {
+bool spawn_server_process(ClientContext *ctx) {
     int pid = fork();
     if (pid == 0) {
-        // Child process: execute the server
-        execl("./serpent_server", "./serpent_server", NULL);
-        // If execl returns, there was an error
+        // child process: execute the server with appropriate arguments
+        char time_arg[16];
+        if (ctx->time_remaining >= 0) {
+            snprintf(time_arg, sizeof(time_arg), "%d", ctx->time_remaining);
+        } else {
+            snprintf(time_arg, sizeof(time_arg), "-1");
+        }
+
+        execl("./serpent-server", "serpent-server",
+            ctx->server_path,
+            ctx->game_mode == GAME_SINGLE ? "1" : "0",
+            time_arg,
+            ctx->obstacles_enabled ? "1" : "0",
+            ctx->obstacles_enabled && ctx->random_world_enabled ? "1" : "0",
+            ctx->obstacles_enabled && !ctx->random_world_enabled ? ctx->file_path : "",
+            NULL);
+        // if execl returns, there was an error
         perror("execl failed");
         exit(1);
     } else if (pid < 0) {
-        // Fork failed
+        // fork failed
         perror("fork failed");
-        return 1; // Indicate failure
+        return false; // indicate failure
     }
 
-    return 0; // Parent process
+    return true; // parent process
 }
 
 void setup_input(ClientContext *ctx, const char *note) {
@@ -135,23 +159,6 @@ void setup_input(ClientContext *ctx, const char *note) {
     ctx->text_len = 0;
     strncpy(ctx->text_note, note, sizeof(ctx->text_note));
 }
-
-/*
-void connect_to_server(ClientContext *ctx) {
-    // TODO: Implement actual Unix domain socket connection
-    // struct sockaddr_un addr;
-    // ctx->socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    // addr.sun_family = AF_UNIX;
-    // strncpy(addr.sun_path, ctx->server_path, sizeof(addr.sun_path) - 1);
-    // connect(ctx->socket_fd, (struct sockaddr*)&addr, sizeof(addr));
-
-    // todo error handling and check
-
-    ctx->socket_fd = 1; // dummy socket fd for now
-
-    // send_msg(MSG_JOIN); todo
-}
-*/
 
 bool connect_to_server(ClientContext *ctx) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -172,6 +179,7 @@ bool connect_to_server(ClientContext *ctx) {
 
 // server must bind to the socket path before this returns true
 // we will wait for that
+// blocking call
 bool wait_for_server_socket(const char *path, int timeout_ms) {
     const int step_ms = 50;
     int waited = 0;
@@ -200,8 +208,4 @@ void disconnect_from_server(ClientContext *ctx) {
         close(ctx->socket_fd);
         ctx->socket_fd = -1;
     }
-}
-
-void load_from_file(ClientContext *ctx, const char *file_path) {
-
 }

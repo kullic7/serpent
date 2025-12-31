@@ -81,6 +81,12 @@ bool dequeue_key(ClientInputQueue *q, Key *key) {
     return true;
 }
 
+void client_input_queue_flush(ClientInputQueue *q) {
+    pthread_mutex_lock(&q->lock);
+    q->count = 0;
+    pthread_mutex_unlock(&q->lock);
+}
+
 
 void enqueue_msg(ServerInputQueue *q, Message msg) {
     pthread_mutex_lock(&q->lock);

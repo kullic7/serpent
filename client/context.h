@@ -35,6 +35,7 @@ typedef struct {
     char server_path[512]; // unix domain socket path
 
     volatile bool running;
+    char error_message[512];
     ClientMode mode;
 
     // input state
@@ -47,8 +48,6 @@ typedef struct {
     MenuStack menus;
 
     Menu main_menu;
-    //Menu new_game_menu;
-    //Menu multiplayer_menu;
     Menu mode_select_menu;
     Menu world_select_menu;
     Menu load_menu;
@@ -56,7 +55,7 @@ typedef struct {
     Menu pause_menu;
     Menu game_over_menu;
     Menu awaiting_menu;
-    //Menu join_menu;
+    Menu error_menu;
 
     // current game state/rendering
     GameRenderState game;
@@ -90,15 +89,12 @@ typedef struct {
     MenuStack stack;
 
     Menu main_menu;
-    Menu new_game_menu;
-    Menu multiplayer_menu;
     Menu mode_select_menu;
     Menu world_select_menu;
     Menu load_menu;
     Menu pause_menu;
     Menu game_over_menu;
     Menu awaiting_menu;
-    Menu join_menu;
 } MenuState;
 
 typedef struct {
@@ -131,12 +127,9 @@ void disconnect_from_server(ClientContext *ctx); // should modify just net subct
 
 bool spawn_connect_create_server(ClientContext *ctx); // should modify just net subctx
 
-int spawn_server_process(ClientContext *ctx); // should modify just net subctx
+bool spawn_server_process(ClientContext *ctx); // should modify just net subctx
 
 void setup_input(ClientContext *ctx, const char *note);
-
-void load_from_file(ClientContext *ctx, const char *file_path); // pushes menu
-void save_to_file(ClientContext *ctx, const char *file_path); // uses game sub
 
 void on_time_entered(void *ctx_ptr, const char *text); // pushes menu
 void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path); // uses modifies net and mode

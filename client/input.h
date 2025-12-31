@@ -3,7 +3,7 @@
 
 #include "game.h"
 #include <pthread.h>
-#include "common/protocol.h"
+#include "protocol.h"
 
 typedef size_t Key;
 typedef struct ClientInputQueue {
@@ -32,6 +32,7 @@ void server_input_queue_destroy(ServerInputQueue *q);
 
 void enqueue_key(ClientInputQueue *q, Key key);
 bool dequeue_key(ClientInputQueue *q, Key *key);
+void client_input_queue_flush(ClientInputQueue *q);
 
 void enqueue_msg(ServerInputQueue *q, Message msg);
 bool dequeue_msg(ServerInputQueue *q, Message *msg);

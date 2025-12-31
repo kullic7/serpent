@@ -1,4 +1,5 @@
 #include "client.h"
+#include <unistd.h>
 
 void *read_input_thread(void *arg) {
     const InputThreadArgs *args = arg;

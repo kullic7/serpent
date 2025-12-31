@@ -1,6 +1,5 @@
 #include "menu.h"
-#include "common/config.h"
-#include <stdio.h>
+#include "config.h"
 #include <string.h>
 
 void init_menus_stack(MenuStack *ms) {
