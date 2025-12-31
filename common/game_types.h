@@ -2,7 +2,7 @@
 #define SERPENT_GAME_TYPES_H
 
 #include <stdbool.h>
-#include "common/config.h"
+#include "config.h"
 
 typedef struct {
     int x;

@@ -1,6 +1,8 @@
 #ifndef SERPENT_CONFIG_H
 #define SERPENT_CONFIG_H
 
+#define LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #define MAX_CLIENTS 16
 #define TICK_RATE 10  // Game updates per second
 #define INITIAL_SNAKE_LENGTH 3
