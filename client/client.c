@@ -4,6 +4,7 @@
 #include "protocol.h"
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) {
     while (ctx->running) {
@@ -55,7 +56,7 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
             };
             ctx->score = (int)state.score;
             //render_game(&ctx->game);
-            render_game(&state);
+            render_game(state);
         }
     }
 

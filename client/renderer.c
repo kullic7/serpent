@@ -92,7 +92,7 @@ void render_menu(const Menu *menu, const InputMode input_mode, const char *text_
 }
 
 
-void render_game(const GameRenderState *state) {
+void render_game(const GameRenderState state) {
     TermSize ts;
     term_get_size(&ts);
 
@@ -101,43 +101,42 @@ void render_game(const GameRenderState *state) {
     term_hide_cursor();
 
     // draw borders
-    draw_box(75, 5, state->width + 1, state->height + 1);
+    draw_box(75, 5, state.width + 1, state.height + 1);
 
     // draw score and time
     draw_text(2, 1, "Score:");
     char score_str[32];
-    snprintf(score_str, sizeof(score_str), "%zu", state->score);
+    snprintf(score_str, sizeof(score_str), "%zu", state.score);
     draw_text(9, 1, score_str);
 
-    if (state->time_remaining >= 0) {
+    if (state.time_remaining >= 0) {
         draw_text(2, 2, "Remaining time:");
         char time_str[64];
-        snprintf(time_str, sizeof(time_str), "%ds", state->time_remaining);
+        snprintf(time_str, sizeof(time_str), "%ds", state.time_remaining);
         draw_text(18, 2, time_str);
     }
 
     // draw fruits
-    for (size_t i = 0; i < state->fruit_count; ++i) {
-        Position fruit = state->fruits[i];
+    for (size_t i = 0; i < state.fruit_count; ++i) {
+        const Position fruit = state.fruits[i];
         draw_text(fruit.x + 2, fruit.y + 2, FRUIT_CHAR);
     }
 
     // draw obstacles
-    for (size_t i = 0; i < state->obstacle_count; ++i) {
-        Obstacle obstacle = state->obstacles[i];
+    for (size_t i = 0; i < state.obstacle_count; ++i) {
+        const Obstacle obstacle = state.obstacles[i];
         draw_text(obstacle.pos.x + 2, obstacle.pos.y + 2, OBSTACLE_CHAR);
     }
 
     // draw snakes
-    for (size_t i = 0; i < state->snake_count; ++i) {
-        const Position head = state->snakes[i].body[0];
+    for (size_t i = 0; i < state.snake_count; ++i) {
+        const Position head = state.snakes[i].body[0];
         draw_text(head.x + 2, head.y + 2, "O");
-        for (size_t j = 0; j < state->snakes[i].length; ++j) {
-            Position body = state->snakes[i].body[j];
+        for (size_t j = 0; j < state.snakes[i].length; ++j) {
+            const Position body = state.snakes[i].body[j];
             draw_text(body.x + 2, body.y + 2, SNAKE_CHAR);
         }
     }
-
 
     fflush(stdout);
 

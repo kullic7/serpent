@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "config.h"
+#include "timer.h"
 
 typedef struct {
     int x;
@@ -50,6 +51,7 @@ typedef struct {
     Snake snake;
     size_t score;
     bool paused;
+    Timer timer;
 } Player;
 
 typedef struct {
@@ -61,6 +63,21 @@ typedef struct {
     Position pos;
 } Obstacle;
 
+typedef struct {
+    int width;
+    int height;
 
+    size_t score;
+    int time_remaining; // in seconds, -1 means no limit
+
+    size_t snake_count;
+    RenderSnake *snakes;
+
+    size_t fruit_count;
+    Position *fruits;
+
+    size_t obstacle_count;
+    Obstacle *obstacles;
+} GameRenderState;
 
 #endif //SERPENT_GAME_TYPES_H

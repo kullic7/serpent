@@ -2,7 +2,7 @@
 #define SERPENT_CONTEXT_H
 
 #include "menu.h"
-#include "game.h"
+#include "game_types.h"
 
 //------------------------
 

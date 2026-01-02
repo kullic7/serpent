@@ -1,7 +1,7 @@
 #ifndef SERPENT_INPUT_H
 #define SERPENT_INPUT_H
 
-#include "game.h"
+#include "game_types.h"
 #include <pthread.h>
 #include "protocol.h"
 
