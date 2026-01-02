@@ -1,6 +1,6 @@
 #include "client.h"
 #include "renderer.h"
-#include "actions.h"
+#include "buttons.h"
 #include "protocol.h"
 #include <string.h>
 #include <unistd.h>

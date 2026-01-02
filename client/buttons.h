@@ -1,5 +1,5 @@
-#ifndef SERPENT_ACTIONS_H
-#define SERPENT_ACTIONS_H
+#ifndef SERPENT_BUTTONS_H
+#define SERPENT_BUTTONS_H
 
 // button actions/callbacks
 
@@ -26,4 +26,4 @@ void btn_load_from_file(void *ctx_ptr);
 
 void btn_cancel_awaiting(void *ctx_ptr);
 
-#endif //SERPENT_ACTIONS_H
+#endif //SERPENT_BUTTONS_H
