@@ -1,8 +1,6 @@
 #ifndef SERPENT_EVENT_H
 #define SERPENT_EVENT_H
-#include <stddef.h>
-#include <bits/pthreadtypes.h>
-
+#include <pthread.h>
 #include "config.h"
 #include <stdbool.h>
 
@@ -25,6 +23,19 @@ typedef struct {
         int player_id;
     } u;
 } Event;
+
+// event queue
+typedef struct {
+    Event events[MAX_EVENTS];
+    size_t count;
+    pthread_mutex_t lock;
+    pthread_cond_t not_full;
+} EventQueue;
+
+void event_queue_init(EventQueue *q);
+void event_queue_destroy(EventQueue *q);
+void enqueue_event(EventQueue *q, Event ev);
+bool dequeue_event(EventQueue *q, Event *ev);
 
 // commands from main thread to worker (worker may respond with events)
 typedef enum {
@@ -58,21 +69,8 @@ typedef struct {
     } u;
 } Action;
 
-// *-------------- queue implementations -----------------
 
-typedef struct {
-    Event events[MAX_EVENTS];
-    size_t count;
-    pthread_mutex_t lock;
-    pthread_cond_t not_full;
-} EventQueue;
-
-void event_queue_init(EventQueue *q);
-void event_queue_destroy(EventQueue *q);
-void enqueue_event(EventQueue *q, Event ev);
-bool dequeue_event(EventQueue *q, Event *ev);
-
-
+// action queue
 typedef struct {
     Action actions[MAX_ACTIONS];
     size_t count;
@@ -84,17 +82,5 @@ void action_queue_init(ActionQueue *q);
 void action_queue_destroy(ActionQueue *q);
 void enqueue_action(ActionQueue *q, Action act);
 bool dequeue_action(ActionQueue *q, Action *act);
-
-void exec_action(const Action *act, EventQueue *q); // actions come via output queue and are handled in worker thread only
-void handle_event(const Event *ev, ActionQueue *q); // events come via input queue and are handled in main thread only
-
-typedef struct {
-    EventQueue *eq;
-    ActionQueue *aq;
-    const _Atomic bool *running;
-} ActionThreadArgs;
-
-// worker thread function
-void *action_thread(void *arg);
 
 #endif //SERPENT_EVENT_H

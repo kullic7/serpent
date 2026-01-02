@@ -1,98 +1,91 @@
 #include "event.h"
+#include <pthread.h>
 
-void handle_event(const Event *ev, ActionQueue *q) {
-    Action a;
-    switch (ev->type) {
-        case EV_CONNECTED:
-            // add_player(&game_state)
-            //ctx->game.players[ctx->game.player_count++] = ev->u.player_id;
-
-            a.type = ACT_SEND_GAME_OVER;
-            a.u.player_id = ev->u.player_id;
-            enqueue_action(q, a);
-            break;
-        case EV_LOADED:
-            // world loaded, can start game
-            //ctx->world_loaded = true;
-            break;
-        case EV_PAUSED:
-            // client paused game
-            // game_state handle it ev->u.player_id
-            break;
-        case EV_RESUMED:
-            // resume game
-            // game_state handle it ev->u.player_id
-            break;
-        case EV_DISCONNECTED:
-            // remove player from game state ev->u.player_id
-            a.type = ACT_UNREGISTER_PLAYER;
-            a.u.player_id = ev->u.player_id;
-            enqueue_action(q, a);
-            break;
-        case EV_ERROR:
-            // handle error by sending error msg to player ev->u.player_id
-            a.type = ACT_SEND_ERROR;
-            a.u.player_id = ev->u.player_id;
-            enqueue_action(q, a);
-            break;
-
-        default:
-            break;
+void event_queue_init(EventQueue *q) {
+    q->count = 0;
+    int rc = pthread_mutex_init(&q->lock, NULL);
+    if (rc != 0) {
+        // handle error
+    }
+    rc = pthread_cond_init(&q->not_full, NULL);
+    if (rc != 0) {
+        // handle error
     }
 }
 
-void exec_action(const Action *act, EventQueue *q) {
-    Event ev;
-    switch (act->type) {
-        case ACT_LOAD_WORLD:
-            // load_world(); // blocking
-            ev.type = EV_LOADED;
-            ev.u.nodata = 0;
-            enqueue_event(q, ev);
-            break;
-        case ACT_SEND_READY:
-            // send ready message to client act->u.player_id
-            //send_msg(act->u.player_id, MSG_READY, NULL, 0); // blocking
-            break;
-        case ACT_SEND_GAME_OVER:
-            // send ready message to client act->u.player_id
-            //send_msg(act->u.player_id, MSG_GAME_OVER, NULL, 0); // blocking
-            break;
-        case ACT_BROADCAST_SHUT_DOWN:
-            // send shutdown message to all clients
-            // broadcast_msg(MSG_SHUT_DOWN, NULL, 0);
-            break;
-        case ACT_BROADCAST_GAME_STATE:
-            // send game state act->u.state to all clients
-            // TODO serialize state
-            // broadcast_msg(MSG_GAME_STATE, NULL, 0);
-            break;
-        case ACT_UNREGISTER_PLAYER:
-            // remove player from game state act->u.player_id
-            break;
-        case ACT_SEND_ERROR:
-            // send error message to client act->u.player_id
-            //send_msg(act->u.player_id, MSG_ERROR, NULL, 0); // blocking
-            break;
-        default:
-            break;
+void event_queue_destroy(EventQueue *q) {
+    pthread_mutex_destroy(&q->lock);
+    pthread_cond_destroy(&q->not_full);
+}
+
+void enqueue_event(EventQueue *q, const Event ev) {
+    pthread_mutex_lock(&q->lock);
+    while (q->count >= MAX_EVENTS) {
+        pthread_cond_wait(&q->not_full, &q->lock);
+    }
+    q->events[q->count++] = ev;
+    pthread_mutex_unlock(&q->lock);
+}
+
+bool dequeue_event(EventQueue *q, Event *ev) {
+    pthread_mutex_lock(&q->lock);
+    if (q->count == 0) {
+        pthread_mutex_unlock(&q->lock);
+        return false;
+    }
+    *ev = q->events[0];
+
+    // shift remaining events
+    for (size_t i = 1; i < q->count; ++i) {
+        q->events[i - 1] = q->events[i];
+    }
+    q->count--;
+    pthread_cond_signal(&q->not_full);
+    pthread_mutex_unlock(&q->lock);
+    return true;
+}
+
+
+void action_queue_init(ActionQueue *q) {
+    q->count = 0;
+    int rc = pthread_mutex_init(&q->lock, NULL);
+    if (rc != 0) {
+        // handle error
+    }
+    rc = pthread_cond_init(&q->not_full, NULL);
+    if (rc != 0) {
+        // handle error
     }
 }
 
-void *action_thread(void *arg) {
-    const ActionThreadArgs *args = arg;
+void action_queue_destroy(ActionQueue *q) {
+    pthread_mutex_destroy(&q->lock);
+    pthread_cond_destroy(&q->not_full);
+}
 
-    EventQueue *eq = args->eq;
-    ActionQueue *aq = args->aq;
-    const _Atomic bool *running = args->running;
-
-    Action act;
-
-    while (*running) {
-        while (dequeue_action(aq, &act)) {
-            exec_action(&act, eq);
-        }
+void enqueue_action(ActionQueue *q, const Action act) {
+    pthread_mutex_lock(&q->lock);
+    while (q->count >= MAX_ACTIONS) {
+        pthread_cond_wait(&q->not_full, &q->lock);
     }
+    q->actions[q->count++] = act;
+    pthread_mutex_unlock(&q->lock);
+}
 
-    return NULL;
+bool dequeue_action(ActionQueue *q, Action *act) {
+    pthread_mutex_lock(&q->lock);
+    if (q->count == 0) {
+        pthread_mutex_unlock(&q->lock);
+        return false;
+    }
+    *act = q->actions[0];
+
+    // shift remaining actions
+    for (size_t i = 1; i < q->count; ++i) {
+        q->actions[i - 1] = q->actions[i];
+    }
+    q->count--;
+    pthread_cond_signal(&q->not_full);
+    pthread_mutex_unlock(&q->lock);
+    return true;
 }
