@@ -12,7 +12,10 @@ typedef enum {
     EV_LOADED, // worker signals world loaded : main handles. ... no params
     EV_PAUSED, // input thread signals pause clicked : main handles ... player id
     EV_RESUMED, // input thread signals resume clicked : main handles
+    EV_WAITED_AFTER_RESUME, // player id
     EV_DISCONNECTED, // input thread signals player disconnected : main handles
+    EV_NO_PLAYERS, // worker signals no players left : main handles (send shutdown)
+    EV_WAITED_FOR_GAME_OVER, // worker signals wait time over : main handles (send game over)
     EV_ERROR, // worker signals error occurred : main handles (send_error_msg)
 } EventType;
 
@@ -42,9 +45,12 @@ typedef enum {
     ACT_LOAD_WORLD, // main -> worker: response event EV_LOADED
     ACT_SEND_READY, // (worker sends EV_CONNECTED) main -> worker: send msg ready, with player info
     ACT_SEND_GAME_OVER, // send msg game over, with player info + game info
-    ACT_BROADCAST_SHUT_DOWN, // no params
+    //ACT_BROADCAST_GAME_OVER, // broadcast msg game over, with game info
+    //ACT_BROADCAST_SHUT_DOWN, // no params
     ACT_BROADCAST_GAME_STATE, // WorldState param
     ACT_UNREGISTER_PLAYER, // player id param
+    ACT_WAIT_FOR_END, // seconds
+    ACT_WAIT_PAUSED, // player id param
     ACT_SEND_ERROR, // player id param
 } ActionType;
 
@@ -53,6 +59,11 @@ typedef struct {
     int time_in_game; // in seconds
     int score;
 } PlayerInfo;
+
+typedef struct {
+    int player_id;
+    int seconds;
+} PlayerWait;
 
 typedef struct {
     int world_id;
@@ -64,6 +75,8 @@ typedef struct {
     ActionType type;
     union {
         int             player_id;
+        int             end_in_seconds;
+        PlayerWait      wait;
         PlayerInfo      info;
         WorldState      state;
     } u;
