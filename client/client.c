@@ -476,3 +476,16 @@ void handle_text_input(ClientContext *ctx, const Key key) {
         ctx->text_buffer[ctx->text_len++] = (char)key;
         }
 }
+
+// thread functions
+
+void *read_input_thread(void *arg) {
+    const InputThreadArgs *args = arg;
+
+    ClientInputQueue *queue = args->queue;
+    const _Atomic bool *running = args->running;
+
+    read_keyboard_input(queue, running);
+
+    return NULL;
+}

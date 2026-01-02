@@ -19,11 +19,6 @@ typedef struct ServerInputQueue {
     pthread_cond_t not_full;
 } ServerInputQueue;
 
-typedef struct {
-    ClientInputQueue *queue;
-    const _Atomic bool *running;
-} InputThreadArgs;
-
 void client_input_queue_init(ClientInputQueue *q);
 void client_input_queue_destroy(ClientInputQueue *q);
 

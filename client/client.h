@@ -34,4 +34,13 @@ void handle_game_key(Key key, ClientContext *ctx); // should map key to directio
 void handle_server_msg(ClientContext *ctx, Message msg); // should modify game sub context
 void handle_text_input(ClientContext *ctx, Key key); // should modify oly input sub context
 
+// thread functions
+
+typedef struct {
+    ClientInputQueue *queue;
+    const _Atomic bool *running;
+} InputThreadArgs;
+
+void *read_input_thread(void *arg);
+
 #endif //SERPENT_CLIENT_H

@@ -1,17 +1,6 @@
 #include "client.h"
 #include <unistd.h>
 
-void *read_input_thread(void *arg) {
-    const InputThreadArgs *args = arg;
-
-    ClientInputQueue *queue = args->queue;
-    const _Atomic bool *running = args->running;
-
-    read_keyboard_input(queue, running);
-
-    return NULL;
-}
-
 int main(int argc, char *argv[]) {
     ClientContext ctx;
 
