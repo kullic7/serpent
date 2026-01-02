@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <time.h>
 #include "logging.h"
+#include "config.h"
 
 
-void log_message(const char *message) {
+void log_message(const char *message, const char *filename) {
     time_t now = time(NULL);
     struct tm *timeinfo = localtime(&now);
     char timestamp[32];
@@ -15,9 +16,17 @@ void log_message(const char *message) {
         snprintf(timestamp, sizeof(timestamp), "unknown time");
     }
 
-    FILE *log = fopen(LOG_FILE, "a");
+    FILE *log = fopen(filename, "a");
     if (log) {
         fprintf(log, "[%s] %s\n", timestamp, message);
         fclose(log);
     }
+}
+
+void log_server(const char *message) {
+    log_message(message, SERVER_LOG_FILE);
+}
+
+void log_client(const char *message) {
+    log_message(message, CLIENT_LOG_FILE);
 }
