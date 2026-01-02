@@ -107,6 +107,7 @@ bool spawn_connect_create_server(ClientContext *ctx) {
         return false;
     }
 
+    // simplified readiness check for unix socket so we do not connect too early
     if (!wait_for_server_socket(ctx->server_path, 3000)) {
         snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
              "Error. Server did not create socket in time.");
@@ -177,8 +178,8 @@ bool connect_to_server(ClientContext *ctx) {
     return true;
 }
 
-// server must bind to the socket path before this returns true
-// we will wait for that
+// server must create socket before this returns true
+// we will wait for that ... simplified readiness check for unix socket
 // blocking call
 bool wait_for_server_socket(const char *path, int timeout_ms) {
     const int step_ms = 50;

@@ -1,36 +1,10 @@
-#define _POSIX_C_SOURCE 199309L
 #include "config.h"
 #include "renderer.h"
-#include <time.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "timer.h"
 
-void sleep_frame() {
-    static struct timespec last_frame = {0};
-    struct timespec current_time, sleep_time;
-    long elapsed_ms, sleep_ms;
-
-    clock_gettime(CLOCK_MONOTONIC, &current_time);
-
-    if (last_frame.tv_sec == 0 && last_frame.tv_nsec == 0) {
-        last_frame = current_time;
-        return;
-    }
-
-    elapsed_ms = (current_time.tv_sec - last_frame.tv_sec) * 1000 +
-                 (current_time.tv_nsec - last_frame.tv_nsec) / 1000000;
-
-    sleep_ms = FRAME_TIME_MS - elapsed_ms;
-
-    if (sleep_ms > 0) {
-        sleep_time.tv_sec = sleep_ms / 1000;
-        sleep_time.tv_nsec = (sleep_ms % 1000) * 1000000;
-        nanosleep(&sleep_time, NULL);
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &last_frame);
-}
 
 void term_clear(void) {
     printf("\033[2J");
@@ -114,7 +88,7 @@ void render_menu(const Menu *menu, const InputMode input_mode, const char *text_
 
     fflush(stdout);
 
-    sleep_frame();
+    sleep_frame(FRAME_TIME_MS);
 }
 
 
@@ -167,7 +141,7 @@ void render_game(const GameRenderState *state) {
 
     fflush(stdout);
 
-    sleep_frame();
+    sleep_frame(FRAME_TIME_MS);
 }
 
 

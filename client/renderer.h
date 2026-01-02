@@ -16,8 +16,6 @@ void render_menu(const Menu *menu, InputMode input_mode, const char *text_note,
     const char *text_buffer, size_t text_len);
 void render_game(const GameRenderState *state);
 
-void sleep_frame();
-
 void term_clear(void);
 void term_home(void);
 void term_hide_cursor(void);
