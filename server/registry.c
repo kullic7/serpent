@@ -1,10 +1,6 @@
 #include "registry.h"
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <stdbool.h>
-#include <pthread.h>
-#include <stdio.h>
 
 void registry_init(ClientRegistry *r) {
     r->capacity = 8;
@@ -74,51 +70,5 @@ void remove_client(ClientRegistry *r, const int id) {
     free(removed);
 }
 
-
-void *recv_input_thread(void *arg) {
-    const RecvInputThreadArgs *args = arg;
-
-    //InputQueue *queue = args->queue;
-    const _Atomic bool *running = args->running;
-
-    //recv_all(queue, running);
-    // translate to Events
-    // enqueue to server's input queue
-
-    return NULL;
-}
-
-void accept_connection(ClientRegistry *r, const int listen_fd) {
-    char buf[64];
-    snprintf(buf, sizeof buf, "listening for connections on fd %d\n", listen_fd);
-    log_server(buf);
-
-    const int client_fd = accept(listen_fd, NULL, NULL);
-
-    snprintf(buf, sizeof buf, "accepted connection from fd %d\n", client_fd);
-    log_server(buf);
-
-    if (client_fd < 0) return; // handle error
-
-    pthread_t input_thread;
-    RecvInputThreadArgs args = {0};
-    int rc = pthread_create(&input_thread, NULL, recv_input_thread, &args);
-    if (rc != 0) {
-        // handle error
-        close(client_fd);
-    }
-
-    register_client(r, client_fd, input_thread);
-    snprintf(buf, sizeof buf, "registered client fd %d\n", client_fd);
-    log_server(buf);
-}
-
-void accept_loop(ClientRegistry *r, const int listen_fd, const _Atomic bool *accepting) {
-    // TODO signal for graceful shutdown
-    log_server("entering accept loop \n");
-    while (*accepting) {
-        accept_connection(r, listen_fd);
-    }
-}
 
 
