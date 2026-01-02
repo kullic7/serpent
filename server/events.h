@@ -1,5 +1,5 @@
-#ifndef SERPENT_EVENT_H
-#define SERPENT_EVENT_H
+#ifndef SERPENT_EVENTS_H
+#define SERPENT_EVENTS_H
 #include <pthread.h>
 #include "config.h"
 #include <stdbool.h>
@@ -83,4 +83,4 @@ void action_queue_destroy(ActionQueue *q);
 void enqueue_action(ActionQueue *q, Action act);
 bool dequeue_action(ActionQueue *q, Action *act);
 
-#endif //SERPENT_EVENT_H
+#endif //SERPENT_EVENTS_H

@@ -1,4 +1,4 @@
-#include "event.h"
+#include "events.h"
 #include <pthread.h>
 
 void event_queue_init(EventQueue *q) {
