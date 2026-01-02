@@ -1,25 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
-#include <string.h>
-#include <stdbool.h>
+#include <sys/un.h>
+
 #include "registry.h"
-
-
-void *accept_loop_thread(void *arg) {
-    const AcceptLoopThreadArgs *args = arg;
-
-    ClientRegistry *registry = args->registry;
-    const int listen_fd = args->listen_fd;
-    const _Atomic bool *accepting = args->accepting;
-
-    accept_loop(registry, listen_fd, accepting);
-
-    return NULL;
-}
+#include "server.h"
+#include "logging.h"
 
 
 int main(int argc, char **argv) {
@@ -61,36 +48,17 @@ int main(int argc, char **argv) {
 
     // handle connections + input receiving
     // --------------------------------------------------------
-    int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    const int listen_fd = setup_server_socket(socket_path);
 
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
-
-    // Remove old socket file if it exists
-    if (unlink(socket_path) == -1) {
-        perror("unlink");
-    }
-
-    int status = bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr));
-    if (status == -1) {
-        perror("bind");
-        close(listen_fd);
-        exit(1);
-    }
-    int statusl = listen(listen_fd, SOMAXCONN);
-    if (statusl == -1) {
-        perror("listen");
-        close(listen_fd);
-        exit(1);
+    if (listen_fd < 0) {
+        log_server("failed to set up server socket\n");
+        exit(1); // client fails on timeout
     }
 
     ClientRegistry registry;
     registry_init(&registry);
     _Atomic bool accepting = true;
 
-    // handle connections + input receiving
     if (single_player) {
         // in single player no extra thread needed
         accept_connection(&registry, listen_fd); // blocking call; accept one and return
@@ -101,7 +69,7 @@ int main(int argc, char **argv) {
         // in multiplayer spawn accept thread
         pthread_t accept_thread;
         AcceptLoopThreadArgs args = {&registry, listen_fd, &accepting};
-        int rc = pthread_create(&accept_thread, NULL, accept_loop_thread, &args);
+        const int rc = pthread_create(&accept_thread, NULL, accept_loop_thread, &args);
         if (rc != 0) {
             // handle error
             close(listen_fd);
@@ -115,7 +83,7 @@ int main(int argc, char **argv) {
     _Atomic bool running = true;
     //pthread_t worker_thread;
     //WorkerThreadArgs worker_args = {&registry, &running, game_time};
-    //int rc = pthread_create(&worker_thread, NULL, game_worker_thread, &worker_args);
+    //const int rc = pthread_create(&worker_thread, NULL, game_worker_thread, &worker_args);
     //if (rc != 0) {
     //    // handle error
     //    running = false;
@@ -132,7 +100,7 @@ int main(int argc, char **argv) {
     //game_loop(&registry, inq, outq);
 
 
-    time_t start = time(NULL);
+    const time_t start = time(NULL);
     if (start == (time_t)-1) {
         perror("time");
         return 1;
