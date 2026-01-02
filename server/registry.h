@@ -22,6 +22,6 @@ void registry_destroy(ClientRegistry *r);
 static void registry_grow(ClientRegistry *r);
 void register_client(ClientRegistry *r, int client_fd, pthread_t thread); // main/accept thread responsibility
 void remove_client(ClientRegistry *r, int id); // worker thread responsibility
-size_t find_client(ClientRegistry *r, int id);  // id is socket_fd here or some unique identifier
+static size_t find_client(ClientRegistry *r, int id);  // id is socket_fd here or some unique identifier
 
 #endif //SERPENT_REGISTRY_H
