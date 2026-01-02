@@ -3,9 +3,6 @@
 
 typedef enum {
     MSG_INPUT, // client sends input to server
-    //MSG_JOIN, // client requests to join the game
-    //MSG_CREATE, // client requests to create a new game (sort of special join)
-    //MSG_CONFIG, // client sends game configuration to server
     MSG_PAUSE, // client notifies server of pause
     MSG_RESUME, // client notifies server of resume
     MSG_LEAVE, // client notifies server of leaving
