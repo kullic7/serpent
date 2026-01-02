@@ -49,6 +49,7 @@ typedef struct {
     int id;
     Snake snake;
     size_t score;
+    bool paused;
 } Player;
 
 typedef struct {

@@ -7,7 +7,6 @@
 #define CLIENT_LOG_FILE "client_log.txt"
 
 #define MAX_CLIENTS 16
-#define TICK_RATE 10  // Game updates per second
 #define INITIAL_SNAKE_LENGTH 3
 #define FRUIT_COUNT 5
 
@@ -22,8 +21,12 @@
 #define BUTTON_HEIGHT 10
 
 
-#define TARGET_FPS 60
+#define TARGET_FPS 60 // frames per second for rendering
 #define FRAME_TIME_MS (1000 / TARGET_FPS)
+#define GAME_TICK_RATE 10 // game updates per second .. sort of speed
+#define GAME_TICK_TIME_MS (1000 / GAME_TICK_RATE)
+
+#define MAX_FRUITS 30
 
 #define SNAKE_CHAR "o"
 #define FRUIT_CHAR "*"

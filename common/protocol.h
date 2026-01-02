@@ -16,7 +16,7 @@ typedef enum {
 
 typedef struct MessageHeader {
     MessageType type;
-    int client_id;
+    //int client_id;
     int payload_size;
 } MessageHeader;
 
