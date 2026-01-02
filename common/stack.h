@@ -1,4 +1,0 @@
-#ifndef SERPENT_STACK_H
-#define SERPENT_STACK_H
-
-#endif //SERPENT_STACK_H
