@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-add_executable(serpent client/client_main.c
+add_executable(serpent-client client/client_main.c
         client/client.c
         client/input.c
         client/renderer.c
@@ -13,6 +13,7 @@ add_executable(serpent client/client_main.c
         client/context.c
         client/actions.c)
 
-target_include_directories(serpent PRIVATE
-        ${CMAKE_SOURCE_DIR}
+target_include_directories(serpent-client PRIVATE
+        ${CMAKE_SOURCE_DIR}/client
+        ${CMAKE_SOURCE_DIR}/common
 )
