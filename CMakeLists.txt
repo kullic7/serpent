@@ -7,11 +7,11 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 add_executable(serpent-client client/main.c
         client/client.c
-        client/input.c
         client/renderer.c
-        client/menu.c
+        client/buttons.c
         client/context.c
-        client/actions.c
+        client/menu.c
+        client/input.c
         common/logging.c
 )
 
@@ -21,8 +21,9 @@ target_include_directories(serpent-client PRIVATE
 )
 
 add_executable(serpent-server server/main.c
+        server/server.c
         server/registry.c
-        server/event.c
+        server/events.c
         common/logging.c
 )
 
