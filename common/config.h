@@ -3,12 +3,16 @@
 
 #define LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+#define SERVER_LOG_FILE "server_log.txt"
+#define CLIENT_LOG_FILE "client_log.txt"
+
 #define MAX_CLIENTS 16
 #define TICK_RATE 10  // Game updates per second
 #define INITIAL_SNAKE_LENGTH 3
 #define FRUIT_COUNT 5
 
 #define MAX_EVENTS 1024
+#define MAX_ACTIONS 1024
 #define MAX_KEY_EVENTS 16
 #define MAX_MESSAGES 1024
 
