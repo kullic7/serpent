@@ -13,9 +13,9 @@ void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running) {
     tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 
     while (*running) {
-        int ch = getchar();
+        const int ch = getchar();
         if (ch == EOF) break;
-        enqueue_key(queue, (Key)ch);
+        enqueue_key(queue, (Key)ch); // enqueue the key by value
     }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);

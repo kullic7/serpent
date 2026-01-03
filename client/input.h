@@ -33,6 +33,5 @@ void enqueue_msg(ServerInputQueue *q, Message msg);
 bool dequeue_msg(ServerInputQueue *q, Message *msg);
 
 void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running);
-inline void recv_msg(ServerInputQueue *q, Message *msg) {}; // receive message from server socket
 
 #endif //SERPENT_INPUT_H
