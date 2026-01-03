@@ -55,7 +55,7 @@ double timer_elapsed(const Timer *t) {
     return timespec_diff_sec(&t->start_time, &now);
 }
 
-int timer_expired(const Timer *t) {
-    if (t->duration_sec <= 0.0) return 0;
+bool timer_expired(const Timer *t) {
+    if (t->duration_sec <= 0.0) return true;
     return timer_elapsed(t) >= t->duration_sec;
 }
