@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "logging.h"
+
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) {
     while (ctx->running) {
 
@@ -31,9 +33,10 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
         }
 
         // async processing of server messages; when queue is full secondary thread waits
-        Message msg;
+        Message msg; // message payload on heap needs freeing
         while (dequeue_msg(sq, &msg)) {
             handle_server_msg(ctx, msg);
+            message_destroy(&msg);  // if payload_size > 0
         }
 
         if (ctx->mode == CLIENT_MENU || ctx->mode == CLIENT_PAUSED || ctx->mode == CLIENT_GAME_OVER) {
@@ -409,29 +412,70 @@ void handle_menu_key(Menu *menu, const Key key) {
 void handle_game_key(Key key, ClientContext *ctx) {
     if (key == KEY_QUIT || key == KEY_PAUSE || key == KEY_ESC) {
         ctx->mode = CLIENT_PAUSED;
+
+        log_client("sending message paused to server\n");
+        send_pause(ctx->socket_fd);
+        log_client("send\n");
+
         clear_menus_stack(&ctx->menus);
         snprintf(ctx->pause_menu.txt_fields[0].text, sizeof(ctx->pause_menu.txt_fields[0].text),
              "Your current score is: %d", ctx->score);
         menu_push(&ctx->menus, &ctx->pause_menu);
     }
 
-    // otherwise send direction to server
-    //send_msg(MSG_INPUT); TODO
+    Direction dir;
+    switch (key) {
+        case KEY_UP:
+            dir = DIR_UP;
+            break;
+        case KEY_DOWN:
+            dir = DIR_DOWN;
+            break;
+        case KEY_LEFT:
+            dir = DIR_LEFT;
+            break;
+        case KEY_RIGHT:
+            dir = DIR_RIGHT;
+            break;
+        default:
+            return; // ignore other keys
+    }
+
+    log_client("sending direction to server\n");
+    send_input(ctx->socket_fd, dir);
 }
 
 void handle_server_msg(ClientContext *ctx, const Message msg) {
-    // todo process and set payloads accordingly
-    switch (msg.header.type) {
+    // only message handler
+    /*
+     * must interpret payload (here would come deserialization if needed from wire format)
+     * free payload after processing
+     */
+    int time;
+    switch (msg.type) {
         case MSG_READY:
-            on_game_ready(ctx);
+            ctx->mode = CLIENT_PLAYING;
             break;
         case MSG_GAME_OVER:
-            on_game_over(ctx);
+            ctx->mode = CLIENT_GAME_OVER;
+
+            snprintf(ctx->game_over_menu.txt_fields[0].text, sizeof(ctx->game_over_menu.txt_fields[0].text),
+                     "Game over. Your score is: %d", ctx->score);
             break;
         case MSG_STATE:
             // ctx->mode = CLIENT_PLAYING; here we cannot adjust mode otherwise pause won't work
             // todo update game state from payload
-            int i;
+            break;
+        case MSG_TIME:
+            msg_to_time(&msg, &time);
+            ctx->time_remaining = time;
+            break;
+        case MSG_ERROR:
+            ctx->mode = CLIENT_MENU;
+            snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+                 "Error from server: %.*s", msg.payload_size, (char *)msg.payload);
+            clear_menus_stack(&ctx->menus);
+            menu_push(&ctx->menus, &ctx->error_menu);
             break;
         default:
             break;
@@ -487,6 +531,27 @@ void *read_input_thread(void *arg) {
     const _Atomic bool *running = args->running;
 
     read_keyboard_input(queue, running);
+
+    return NULL;
+}
+
+void *recv_server_thread(void *arg) {
+    const ReceiveThreadArgs *args = arg;
+
+    const int socket_fd = args->socket_fd;
+    ServerInputQueue *queue = args->queue;
+    const _Atomic bool *running = args->running;
+
+    while (*running) {
+        Message msg;
+        if (recv_message(socket_fd, &msg) < 0) {
+            // handle error, e.g. connection lost
+            // TODO it should rather send event
+            //break;
+            continue;
+        }
+        enqueue_msg(queue, msg);
+    }
 
     return NULL;
 }

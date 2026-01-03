@@ -1,6 +1,9 @@
 #include "buttons.h"
 #include "context.h"
 #include <string.h>
+#include "protocol.h"
+#include <unistd.h>
+#include "logging.h"
 
 
 void btn_back_in_menu(void *ctx_ptr) {
@@ -13,13 +16,14 @@ void btn_back_in_menu(void *ctx_ptr) {
 void btn_exit_to_main_menu(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
 
-    /*
+
     if (ctx->socket_fd >= 0) {
-        send_message(MSG_LEAVE, ctx, 0); // notify server of leaving
+        log_client("sending leave message to server\n");
+        send_leave(ctx->socket_fd);
+
         close(ctx->socket_fd);
         ctx->socket_fd = -1;
     }
-    */
 
     ctx->mode = CLIENT_MENU;
     clear_menus_stack(&ctx->menus);
@@ -52,7 +56,8 @@ void btn_resume_game(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
     menu_pop(&ctx->menus);
 
-    //send_msg(MSG_RESUME); TODO notify server
+    log_client("sending resume message to server\n");
+    send_resume(ctx->socket_fd);
 
     ctx->mode = CLIENT_PLAYING;
 }
@@ -140,7 +145,10 @@ void btn_load_from_file(void *ctx_ptr) {
 // awaiting menu
 void btn_cancel_awaiting(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
-    //send_msg(MSG_LEAVE); TODO notify server of leaving
+
+    log_client("send leave message to server\n");
+    send_leave(ctx->socket_fd);
+
     ctx->mode = CLIENT_MENU;
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->main_menu);

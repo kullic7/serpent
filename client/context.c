@@ -84,13 +84,6 @@ void on_game_over(void *ctx_ptr) {
              "Game over. Your score is: %d", ctx->score);
 }
 
-void on_game_ready(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-
-    ctx->mode = CLIENT_PLAYING;
-
-}
-
 // used by very first client to spawn server and connect to it
 // single or multi player
 bool spawn_connect_create_server(ClientContext *ctx) {

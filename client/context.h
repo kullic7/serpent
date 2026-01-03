@@ -139,6 +139,5 @@ void on_input_file_entered(void *ctx_ptr, const char *file_path); // uses game s
 // low level event(msg) callbacks
 void on_game_over(void *ctx_ptr);
 void on_game_state(void *ctx_ptr, const GameRenderState *state);
-void on_game_ready(void *ctx_ptr);
 
 #endif //SERPENT_CONTEXT_H

@@ -10,8 +10,6 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq);
 
 void client_cleanup(ClientContext *ctx);
 
-inline void send_msg(ClientContext *ctx, const void *data, size_t size) {}; // send message to server
-
 static void init_menu_fields(Menu *menu, Button *buttons, size_t b_count,
     TextField *txt_fields, size_t t_count, ClientContext *ctx);
 
@@ -41,6 +39,13 @@ typedef struct {
     const _Atomic bool *running;
 } InputThreadArgs;
 
+typedef struct {
+    const int socket_fd;
+    ServerInputQueue *queue;
+    const _Atomic bool *running;
+} ReceiveThreadArgs;
+
 void *read_input_thread(void *arg);
+void *recv_server_thread(void *arg);
 
 #endif //SERPENT_CLIENT_H
