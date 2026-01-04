@@ -1,5 +1,6 @@
 #include "events.h"
 #include <pthread.h>
+#include "logging.h"
 
 void event_queue_init(EventQueue *q) {
     q->count = 0;
@@ -20,6 +21,9 @@ void event_queue_destroy(EventQueue *q) {
 
 void enqueue_event(EventQueue *q, const Event ev) {
     pthread_mutex_lock(&q->lock);
+    if (q->count >= MAX_EVENTS) {
+        log_server("event queue full\n");
+    }
     while (q->count >= MAX_EVENTS) {
         pthread_cond_wait(&q->not_full, &q->lock);
     }
@@ -65,6 +69,9 @@ void action_queue_destroy(ActionQueue *q) {
 
 void enqueue_action(ActionQueue *q, const Action act) {
     pthread_mutex_lock(&q->lock);
+    if (q->count >= MAX_ACTIONS) {
+        log_server("action queue full\n");
+    }
     while (q->count >= MAX_ACTIONS) {
         pthread_cond_wait(&q->not_full, &q->lock);
     }
