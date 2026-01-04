@@ -150,6 +150,68 @@ int send_game_over(const int fd) {
     return send_message(fd, &msg);
 }
 
+int send_state(const int fd, const ClientGameStateSnapshot *st) {
+    // we pack data as header + arrays (bytes)
+    // other message does need this as they have no dynamic arrays
+    const GameStateWireHeader h = {
+        .width = st->width,
+        .height = st->height,
+        .score = st->score,
+        .player_time_elapsed = st->player_time_elapsed,
+        .game_time_remaining = st->game_time_remaining,
+        .snake_count = st->snake_count,
+        .fruit_count = st->fruit_count,
+        .obstacle_count = st->obstacle_count,
+    };
+
+    size_t payload_size = sizeof(h);
+
+    // snakes
+    for (size_t i = 0; i < st->snake_count; i++) {
+        payload_size += sizeof(uint32_t); // length
+        payload_size += st->snakes[i].length * sizeof(Position);
+    }
+
+    payload_size += st->fruit_count    * sizeof(Fruit);
+    payload_size += st->obstacle_count * sizeof(Obstacle);
+
+    void *buf = malloc(payload_size);
+    if (!buf) return -1;
+
+
+    // writing to buffer
+    uint8_t *p = buf;
+
+    memcpy(p, &h, sizeof(h));
+    p += sizeof(h);
+
+    // snakes
+    for (size_t i = 0; i < st->snake_count; i++) {
+        uint32_t len = st->snakes[i].length;
+        memcpy(p, &len, sizeof(len));
+        p += sizeof(len);
+
+        memcpy(p, st->snakes[i].body, len * sizeof(Position));
+        p += len * sizeof(Position);
+    }
+
+    memcpy(p, st->fruits,    st->fruit_count * sizeof(Fruit));
+    p += st->fruit_count * sizeof(Fruit);
+    memcpy(p, st->obstacles, st->obstacle_count * sizeof(Obstacle));
+
+    const Message msg = {
+        .type = MSG_STATE,
+        .payload_size = payload_size,
+        .payload = buf,
+    };
+
+    const int rc = send_message(fd, &msg);
+    free(buf);
+
+    return rc;
+}
+
+
 int send_time(const int fd, int seconds) {
     Message msg;
     msg.type = MSG_TIME;
@@ -166,6 +228,59 @@ int send_error(const int fd, const char *error_msg) {
     msg.payload = (void *)error_msg;
     return send_message(fd, &msg);
 }
+
+// dynamically allocates arrays inside st, caller must free them
+int msg_to_state(const Message *msg, ClientGameStateSnapshot *st) {
+
+    if (!msg || msg->type != MSG_STATE || !msg->payload)
+        return -1;
+
+    const uint8_t *p = msg->payload;
+
+    GameStateWireHeader h;
+    memcpy(&h, p, sizeof(h));
+    p += sizeof(h);
+
+    st->width  = (int)h.width;
+    st->height = (int)h.height;
+    st->score  = h.score;
+    st->player_time_elapsed = (int)h.player_time_elapsed;
+    st->game_time_remaining = (int)h.game_time_remaining;
+
+    // allocate
+
+    st->snake_count = h.snake_count;
+    st->snakes = malloc(h.snake_count * sizeof(SnakeSnapshot));
+
+    for (size_t i = 0; i < st->snake_count; i++) {
+        uint32_t len;
+        memcpy(&len, p, sizeof(len));
+        p += sizeof(len);
+
+        st->snakes[i].length = len;
+        st->snakes[i].body = malloc(len * sizeof(Position));
+
+        memcpy(st->snakes[i].body, p, len * sizeof(Position));
+        p += len * sizeof(Position);
+    }
+
+    st->fruits    = malloc(h.fruit_count * sizeof(Fruit));
+    st->obstacles = malloc(h.obstacle_count * sizeof(Obstacle));
+
+    if (!st->snakes || !st->fruits || !st->obstacles)
+        return -1;
+
+    st->fruit_count  = h.fruit_count;
+    st->obstacle_count = h.obstacle_count;
+
+    memcpy(st->fruits,    p, h.fruit_count * sizeof(Fruit));
+    p += h.fruit_count * sizeof(Fruit);
+
+    memcpy(st->obstacles, p, h.obstacle_count * sizeof(Obstacle));
+
+    return 0;
+}
+
 
 
 int msg_to_input(const Message *msg, Direction *dir) {

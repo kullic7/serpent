@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <protocol.h>
-#include "game_types.h"
+#include "types.h"
 
 typedef enum {
     MSG_INPUT, // client sends input to server
@@ -25,11 +25,27 @@ typedef struct {
     void *payload; // owned by Message
 } Message;
 
-// wire stable helper
+// wire stable helper for generic message
 typedef struct {
     uint32_t type;
     uint32_t payload_size;
 } MsgHeader;
+
+// wire-only header inside payload for state message
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+
+    uint32_t score;
+    uint32_t player_time_elapsed; // for particular player in seconds (time since joining game)
+    uint32_t game_time_remaining; // in seconds, -1 means no limit
+
+    uint32_t snake_count;
+    uint32_t fruit_count;
+    uint32_t obstacle_count;
+} GameStateWireHeader;
+
 
 
 static int send_all(int fd, const void *buf, size_t size);
@@ -50,14 +66,14 @@ int send_resume(int fd);
 int send_leave(int fd);
 int send_ready(int fd);
 int send_game_over(int fd);
-int send_state(int fd, const GameRenderState *st);
+int send_state(int fd, const ClientGameStateSnapshot *st);
 int send_time(int fd, int seconds);
 int send_error(int fd, const char *error_msg);
 
 // (byte recv -> message ... done elsewhere i.e. not called recv_input ...)
 // message -> payload mapping -> type
 int msg_to_input(const Message *msg, Direction *dir);
-int msg_to_state(const Message *msg, GameRenderState *st);
+int msg_to_state(const Message *msg, ClientGameStateSnapshot *st);
 int msg_to_time(const Message *msg, int *seconds);
 int msg_to_error(const Message *msg, char *error_msg);
 
