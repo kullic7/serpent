@@ -8,6 +8,7 @@
 #include <sys/un.h>
 #include <limits.h>
 #include <stdio.h>
+#include <sys/wait.h>
 
 #include "client.h"
 
@@ -36,9 +37,6 @@ void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path) {
         return;
     }
 
-    // TODO this is just for testing, should be after server confirmation
-    ctx->mode = CLIENT_PLAYING;
-
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->awaiting_menu);
 
@@ -56,9 +54,6 @@ void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path) {
         menu_push(&ctx->menus, &ctx->error_menu);
         return;
     }
-
-    // TODO this is just for testing, should be after server confirmation
-    ctx->mode = CLIENT_PLAYING;
 
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->awaiting_menu);
@@ -81,7 +76,7 @@ void on_game_over(void *ctx_ptr) {
     ctx->mode = CLIENT_GAME_OVER;
 
     snprintf(ctx->game_over_menu.txt_fields[0].text, sizeof(ctx->game_over_menu.txt_fields[0].text),
-             "Game over. Your score is: %d", ctx->score);
+             "Game over. Your score is: %d", (int)ctx->game.score);
 }
 
 // used by very first client to spawn server and connect to it
@@ -139,14 +134,30 @@ bool spawn_server_process(ClientContext *ctx) {
             NULL);
         // if execl returns, there was an error
         perror("execl failed");
-        exit(1);
-    } else if (pid < 0) {
+        _exit(1);
+    }
+    if (pid < 0) {
         // fork failed
         perror("fork failed");
         return false; // indicate failure
     }
 
+    ctx->server_pid = pid;
+
     return true; // parent process
+}
+
+void poll_server_exit(ClientContext *ctx) {
+    if (ctx->server_pid <= 0)
+        return;
+
+    int status;
+    pid_t r = waitpid(ctx->server_pid, &status, WNOHANG);
+
+    if (r == ctx->server_pid) {
+        ctx->server_pid = -1; // server is gone
+        // handle server exit
+    }
 }
 
 void setup_input(ClientContext *ctx, const char *note) {

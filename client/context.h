@@ -3,6 +3,7 @@
 
 #include "menu.h"
 #include "game_types.h"
+#include <sched.h>
 
 //------------------------
 
@@ -33,6 +34,7 @@ typedef enum {
 typedef struct {
     int socket_fd;  // socket file descriptor (unix domain sockets allow full duplex byte stream)
     char server_path[512]; // unix domain socket path
+    pid_t server_pid; // if we spawned the server process
 
     volatile bool running;
     char error_message[512];
@@ -59,7 +61,8 @@ typedef struct {
 
     // current game state/rendering
     GameRenderState game;
-    int score;
+    //int score;
+    //int time_elapsed;
 
     // game configuration options
     int time_remaining; // in seconds, -1 means no limit
@@ -128,6 +131,8 @@ void disconnect_from_server(ClientContext *ctx); // should modify just net subct
 bool spawn_connect_create_server(ClientContext *ctx); // should modify just net subctx
 
 bool spawn_server_process(ClientContext *ctx); // should modify just net subctx
+
+void poll_server_exit(ClientContext *ctx);
 
 void setup_input(ClientContext *ctx, const char *note);
 
