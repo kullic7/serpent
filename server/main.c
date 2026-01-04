@@ -7,6 +7,7 @@
 #include "registry.h"
 #include "server.h"
 #include "logging.h"
+#include "game.h"
 
 
 int main(int argc, char **argv) {
@@ -57,21 +58,34 @@ int main(int argc, char **argv) {
 
     ClientRegistry registry;
     registry_init(&registry);
-    _Atomic bool accepting = true;
 
+    _Atomic bool accepting = true;
+    _Atomic bool running = true;
+    _Atomic bool error = false;
+
+    EventQueue events;
+    event_queue_init(&events);
+
+    ActionQueue actions;
+    action_queue_init(&actions);
+
+    pthread_t accept_thread;
     if (single_player) {
         // in single player no extra thread needed
-        accept_connection(&registry, listen_fd); // blocking call; accept one and return
+        RecvInputThreadArgs args = {&events, -1, &running}; // client_fd will be set in accept_connection
+        if (accept_connection(&registry, listen_fd, &args) == -1) error=true; // blocking call; accept one and return
         log_server("not accepting any more messages \n");
         close(listen_fd);
         unlink(socket_path);
     } else {
+        log_server("MULTIPLAYER\n");
         // in multiplayer spawn accept thread
-        pthread_t accept_thread;
-        AcceptLoopThreadArgs args = {&registry, listen_fd, &accepting};
+        RecvInputThreadArgs recv_args = {&events, -1, &running};
+        AcceptLoopThreadArgs args = {&registry, listen_fd, &accepting, &recv_args};
         const int rc = pthread_create(&accept_thread, NULL, accept_loop_thread, &args);
         if (rc != 0) {
             // handle error
+            log_server("failed to start accepting THREAD \n");
             close(listen_fd);
             unlink(socket_path);
             exit(1); // client fails on timeout
@@ -80,43 +94,51 @@ int main(int argc, char **argv) {
 
     // worker thread
     // --------------------------------------------------------
-    _Atomic bool running = true;
-    //pthread_t worker_thread;
-    //WorkerThreadArgs worker_args = {&registry, &running, game_time};
-    //const int rc = pthread_create(&worker_thread, NULL, game_worker_thread, &worker_args);
-    //if (rc != 0) {
-    //    // handle error
-    //    running = false;
-    //    pthread_join(accept_thread, NULL);
-    //    close(listen_fd);
-    //    unlink(socket_path);
-    //    exit(1); // client fails on timeout on awaiting server MSG_READY signal
-    //}
+    pthread_t worker_thread;
+    ActionThreadArgs worker_args = {&events, &actions, &registry, &running};
+    const int rc = pthread_create(&worker_thread, NULL, action_thread, &worker_args);
+    if (rc != 0) {
+        // handle error
+        log_server("failed to start worker THREAD \n");
+        running = false;
+        pthread_join(worker_thread, NULL);
+        close(listen_fd);
+        unlink(socket_path);
+        exit(1); // client fails on timeout on awaiting server MSG_READY signal
+    }
 
     // game loop
     // --------------------------------------------------------
 
-    //game_init(&registry, game_time, obstacles_enabled, random_world, obstacles_file_path);
-    //game_loop(&registry, inq, outq);
+    GameState state;
+    game_init(&state, 40, 20, game_time, obstacles_enabled, random_world, obstacles_file_path); // default size 40x20
 
+    game_run(game_time >= 0, single_player, &state, &events, &actions);
 
-    const time_t start = time(NULL);
-    if (start == (time_t)-1) {
-        perror("time");
-        return 1;
-    }
+    log_server("game loop ended\n");
 
-    while (difftime(time(NULL), start) < 60.0) {
-        // main server loop doing nothing, just for testing
-        sleep(1);
-    }
+    //broadcast_game_over(); // TODO must be done here before shutdown so we are sure all clients get it
 
-    registry_destroy(&registry);
+    accepting = false;
+    running = false;
+
+    registry_destroy(&registry); // joins all client threads
+
+    event_queue_destroy(&events);
+    action_queue_destroy(&actions);
+
+    game_destroy(&state);
+
+    log_server("game destroyed\n");
+
+    pthread_join(worker_thread, NULL);
+
     if (!single_player) {
-        accepting = false;
+        pthread_join(accept_thread, NULL);
         close(listen_fd);
         unlink(socket_path);
     }
+
     log_server(" ---------- Server shut down ------------ \n");
     return 0;
 

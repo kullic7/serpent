@@ -12,7 +12,9 @@ add_executable(serpent-client client/main.c
         client/context.c
         client/menu.c
         client/input.c
+        common/timer.c
         common/logging.c
+        common/protocol.c
 )
 
 target_include_directories(serpent-client PRIVATE
@@ -22,9 +24,12 @@ target_include_directories(serpent-client PRIVATE
 
 add_executable(serpent-server server/main.c
         server/server.c
+        server/game.c
         server/registry.c
         server/events.c
+        common/timer.c
         common/logging.c
+        common/protocol.c
 )
 
 target_include_directories(serpent-server PRIVATE
