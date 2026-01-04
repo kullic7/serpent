@@ -19,6 +19,7 @@ void timer_start(Timer *t);
 
 void timer_reset(Timer *t);
 
+double timer_remaining(const Timer *t);
 double timer_elapsed(const Timer *t);
 
 bool timer_expired(const Timer *t);
