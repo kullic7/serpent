@@ -20,6 +20,7 @@ void btn_exit_to_main_menu(void *ctx_ptr) {
     if (ctx->socket_fd >= 0) {
         log_client("sending leave message to server\n");
         send_leave(ctx->socket_fd);
+        log_client("send\n");
 
         close(ctx->socket_fd);
         ctx->socket_fd = -1;
@@ -58,6 +59,7 @@ void btn_resume_game(void *ctx_ptr) {
 
     log_client("sending resume message to server\n");
     send_resume(ctx->socket_fd);
+    log_client("send\n");
 
     ctx->mode = CLIENT_PLAYING;
 }
@@ -98,7 +100,7 @@ void btn_single_player(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
     ctx->game_mode = GAME_SINGLE;
 
-    strncpy(ctx->server_path, "/tmp/serpent_single_player.sock", sizeof(ctx->server_path));
+    strncpy(ctx->server_path, "serpent_single_player.sock", sizeof(ctx->server_path));
 
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->awaiting_menu);
@@ -107,11 +109,7 @@ void btn_single_player(void *ctx_ptr) {
         ctx->mode = CLIENT_MENU;
         clear_menus_stack(&ctx->menus);
         menu_push(&ctx->menus, &ctx->error_menu);
-        return;
     }
-
-    // TODO this is just for testing, should be after server confirmation
-    ctx->mode = CLIENT_PLAYING;
 
 }
 
@@ -148,6 +146,7 @@ void btn_cancel_awaiting(void *ctx_ptr) {
 
     log_client("send leave message to server\n");
     send_leave(ctx->socket_fd);
+    log_client("send\n");
 
     ctx->mode = CLIENT_MENU;
     clear_menus_stack(&ctx->menus);
