@@ -9,6 +9,7 @@
 #define MAX_CLIENTS 16
 #define INITIAL_SNAKE_LENGTH 3
 #define FRUIT_COUNT 5
+#define OBSTACLE_COUNT 3
 
 #define MAX_EVENTS 1024
 #define MAX_ACTIONS 1024
