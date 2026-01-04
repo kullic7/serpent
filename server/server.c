@@ -82,18 +82,15 @@ void accept_loop(ClientRegistry *r, const int listen_fd, const _Atomic bool *acc
     }
 }
 
-bool handle_event(const Event *ev, ActionQueue *q, GameState *state) {
+bool handle_event(const Event *ev, ActionQueue *q, GameState *game) {
     Action a = {0};
     switch (ev->type) {
         case EV_CONNECTED:
-            // add_player(&game_state) TODO
-            //ctx->game.players[ctx->game.player_count++] = ev->u.player_id;
+            game_add_fruit(game);
+            game_add_player(game, ev->u.player_id);
 
-            state->player_count += 1; // TODO proper player management
             log_server("ev connected received\n");
-            a.type = ACT_SEND_READY;
-            a.u.player_id = ev->u.player_id;
-            enqueue_action(q, a);
+            enqueue_action(q, (Action){ACT_SEND_READY, .u.player_id = ev->u.player_id});
             log_server("act send ready enqueued\n");
             break;
         case EV_LOADED:
@@ -102,35 +99,30 @@ bool handle_event(const Event *ev, ActionQueue *q, GameState *state) {
             break;
         case EV_INPUT:
             // update player input in game state ev->u.input
-            // TODO update game state
+            game_update_player_direction(game, ev->u.input.player_id, ev->u.input.direction);
             log_server("ev input received\n");
             break;
         case EV_PAUSED:
-            // client paused game TODO player stays in game but there are no updates to position of its snake
-            // game_state handle it ev->u.player_id
+            // client paused game
+            game_pause_player(game, ev->u.player_id);
             log_server("ev paused received\n");
             break;
         case EV_RESUMED:
-            // resume game TODO player is paused for 3 seconds
-            // todo set player id into paused = false
+            // resume game  player is paused for 3 seconds
+            game_schedule_resume_player(game, ev->u.player_id);
             log_server("ev resumed received\n");
             a.type = ACT_WAIT_PAUSED;
-            a.u.wait = (PlayerWait){ ev->u.player_id, 3 };
+            a.u.wait = (ActArgPlayerWait){ ev->u.player_id, 3 };
             enqueue_action(q, a);
             log_server("act wait paused enqueued\n");
             break;
         case EV_WAITED_AFTER_RESUME:
-            // TODO player ready for game state updates
-            //  event valid only if not paused otherwise discard
-            //a.u.state = ...; // TODO gather game state
-            //enqueue_action(q, a);
+            game_resume_player(game, ev->u.player_id);
             log_server("ev waited after resume received\n");
             break;
         case EV_DISCONNECTED:
             // remove player from game state ev->u.player_id
-            // TODO remove from game state
-            if (state->player_count > 0) state->player_count -= 1;
-            // TODO proper player management
+            game_remove_player(game, ev->u.player_id);
             log_server("ev disconnected received\n");
             a.type = ACT_UNREGISTER_PLAYER;
             a.u.player_id = ev->u.player_id;
@@ -140,7 +132,8 @@ bool handle_event(const Event *ev, ActionQueue *q, GameState *state) {
         case EV_WAITED_FOR_GAME_OVER:
             // game time elapsed we signal game loop to end
             log_server("ev waited for game over received\n");
-            if (state->player_count <= 0) return true; // no players left after wait time
+            game->wait_for_end_pending = false;
+            if (game->player_count <= 0) return true; // no players left after wait time
             break;
         case EV_ERROR:
             // handle error by sending error msg to player ev->u.player_id
@@ -167,11 +160,15 @@ bool handle_end_event(const bool timed_mode, const bool single_player, const Gam
                 log_server("single player no players left -> shutdown\n");
                 return true; // shutdown immediately
             }
-            Action act;
-            act.type = ACT_WAIT_FOR_END;
-            act.u.end_in_seconds = 10; // wait 10 seconds before shutdown
-            enqueue_action(aq, act);
-            log_server("act wait for end enqueued due no players left\n");
+
+            if (!state->wait_for_end_pending) {
+                Action act;
+                act.type = ACT_WAIT_FOR_END;
+                act.u.end_in_seconds = 10; // wait 10 seconds before shutdown
+                enqueue_action(aq, act);
+                log_server("act wait for end enqueued due no players left\n");
+                ((GameState *)state)->wait_for_end_pending = true;
+            }
             return false;
         }
     }
@@ -210,21 +207,6 @@ static void *end_wait_thread(void *arg) {
     return NULL;
 }
 
-int broadcast_game_state(ClientRegistry *reg, const WorldState state) {
-    // TODO serialize state
-    // for each client in registry send message
-    // for testing we just send time
-    pthread_mutex_lock(&reg->lock);
-    for (size_t i = 0; i < reg->count; ++i) {
-        if (send_time(reg->clients[i]->socket_fd, state.time_elapsed) < 0) {;
-            log_server("failed to send game state to client\n");
-            return -1;
-        }
-    }
-    pthread_mutex_unlock(&reg->lock);
-    return 0;
-}
-
 void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg) {
     Event ev;
     switch (act->type) {
@@ -248,8 +230,9 @@ void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg) {
             break;
         case ACT_BROADCAST_GAME_STATE:
             // send game state act->u.state to all clients
-            // TODO serialize state
-            broadcast_game_state(reg, act->u.state);
+            broadcast_game_state(reg, act->u.game);
+            snapshot_destroy(act->u.game.state); // free dynamic arrays inside
+            free(act->u.game.state); // free the struct itself
             log_server("act send broadcast game state executed\n");
             break;
         case ACT_UNREGISTER_PLAYER:
@@ -338,14 +321,11 @@ void game_run(const bool timed_mode, const bool single_player, GameState *game, 
 
     while (true) {
 
-        // TODO gather game state
-        if (game->player_count > 0) {
-            enqueue_action(aq, (Action){ACT_BROADCAST_GAME_STATE, .u.state = (WorldState){(int)timer_elapsed(&game->timer)}});
-        }
+        game_snapshot_each_client(game, aq);
 
         sleep_frame(GAME_TICK_TIME_MS);
 
-        //game_update(game); TODO
+        game_update(game);
 
         // handle events
         Event ev = {0};

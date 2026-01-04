@@ -45,12 +45,10 @@ void accept_loop(ClientRegistry *r, int listen_fd, const _Atomic bool *accepting
 // handlers
 
 void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg); // actions come via action queue and are handled in worker thread only
-bool handle_event(const Event *ev, ActionQueue *q, GameState *state); // events come via event queue and are handled in main thread only
+bool handle_event(const Event *ev, ActionQueue *q, GameState *game); // events come via event queue and are handled in main thread only
 
 bool handle_end_event(bool timed_mode, bool single_player, const GameState *state, ActionQueue *aq);
 
-
-int broadcast_game_state(ClientRegistry *reg, WorldState state);
 
 // translation (handles input thread)
 // message to event
