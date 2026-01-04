@@ -2,6 +2,13 @@
 #include "timer.h"
 #include <time.h>
 
+void sleepn(const long nanoseconds) {
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = nanoseconds;
+    nanosleep(&ts, NULL);
+}
+
 void sleep_frame(const long sleep_time_ms) {
     static struct timespec last_frame = {0};
     struct timespec current_time, sleep_time;

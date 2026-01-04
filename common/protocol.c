@@ -193,6 +193,19 @@ int msg_to_time(const Message *msg, int *seconds) {
     return 0;
 }
 
+int msg_to_error(const Message *msg, char *error_msg) {
+    if (!msg || !error_msg) return -1;
+    if (msg->type != MSG_ERROR ||
+        msg->payload_size <= 0 ||
+        !msg->payload) {
+        return -1;
+        }
+    // copy payload to error_msg buffer
+    strncpy(error_msg, (char *)msg->payload, msg->payload_size);
+    error_msg[msg->payload_size - 1] = '\0'; // ensure null termination
+    return 0;
+}
+
 
 // portable serde ... network byte order ... avoiding for simplicity
 /*

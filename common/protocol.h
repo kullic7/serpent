@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <protocol.h>
 #include "game_types.h"
 
 typedef enum {

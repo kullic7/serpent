@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdbool.h>
 
+void sleepn(long nanoseconds);
 
 void sleep_frame(long sleep_time_ms);
 
