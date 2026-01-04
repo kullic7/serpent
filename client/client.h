@@ -40,7 +40,7 @@ typedef struct {
 } InputThreadArgs;
 
 typedef struct {
-    const int socket_fd;
+    const int *socket_fd;
     ServerInputQueue *queue;
     const _Atomic bool *running;
 } ReceiveThreadArgs;

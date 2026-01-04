@@ -5,11 +5,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
-
+#include <timer.h>
+#include <poll.h>
 #include "logging.h"
 
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) {
     while (ctx->running) {
+
+        poll_server_exit(ctx);
 
         // TODO signal handling for graceful exit e.g. game time elapsed on server side
         // e.g. servers game over, here we need to recv
@@ -43,23 +46,7 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
             render_menu(menu_current(&ctx->menus), ctx->input_mode, ctx->text_note, ctx->text_buffer, ctx->text_len);
         }
         else if (ctx->mode == CLIENT_PLAYING) {
-            //recv_state(ctx); TODO: receive game state from server ... blocking
-
-            GameRenderState state = {
-                .width = 40,
-                .height = 20,
-                .score = 100,
-                .time_remaining = 25,
-                .snake_count = 0,
-                .snakes = NULL,
-                .fruit_count = 0,
-                .fruits = NULL,
-                .obstacle_count = 0,
-                .obstacles = NULL
-            };
-            ctx->score = (int)state.score;
-            //render_game(&ctx->game);
-            render_game(state);
+            render_game(ctx->game);
         }
     }
 
@@ -71,10 +58,27 @@ void client_init(ClientContext *ctx) {
     ctx->running = true;
     ctx->mode = CLIENT_MENU;
     ctx->socket_fd = -1; // Not connected yet
+    ctx->server_pid = -1;
 
     ctx->input_mode = INPUT_GAME;
 
-    ctx->score = 0;
+    //ctx->score = 0;
+    //ctx->time_elapsed = 0;
+
+    const GameRenderState state = {
+        .width = 0,
+        .height = 0,
+        .score = 0,
+        .time_remaining = 0,
+        .snake_count = 0,
+        .snakes = NULL,
+        .fruit_count = 0,
+        .fruits = NULL,
+        .obstacle_count = 0,
+        .obstacles = NULL
+    };
+
+    ctx->game = state;
 
     // todo probably explicit menu is not needed, can be selected from ctx
     init_main_menu(&ctx->main_menu, ctx);
@@ -419,7 +423,7 @@ void handle_game_key(Key key, ClientContext *ctx) {
 
         clear_menus_stack(&ctx->menus);
         snprintf(ctx->pause_menu.txt_fields[0].text, sizeof(ctx->pause_menu.txt_fields[0].text),
-             "Your current score is: %d", ctx->score);
+             "Your current score is: %d", (int)ctx->game.score);
         menu_push(&ctx->menus, &ctx->pause_menu);
     }
 
@@ -443,6 +447,7 @@ void handle_game_key(Key key, ClientContext *ctx) {
 
     log_client("sending direction to server\n");
     send_input(ctx->socket_fd, dir);
+    log_client("send\n");
 }
 
 void handle_server_msg(ClientContext *ctx, const Message msg) {
@@ -451,32 +456,58 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
      * must interpret payload (here would come deserialization if needed from wire format)
      * free payload after processing
      */
-    int time;
     switch (msg.type) {
         case MSG_READY:
             ctx->mode = CLIENT_PLAYING;
+            log_client("msg ready received\n");
             break;
         case MSG_GAME_OVER:
             ctx->mode = CLIENT_GAME_OVER;
 
             snprintf(ctx->game_over_menu.txt_fields[0].text, sizeof(ctx->game_over_menu.txt_fields[0].text),
-                     "Game over. Your score is: %d", ctx->score);
+                     "Game over. Your score is: %d", (int)ctx->game.score);
+            log_client("msg game over received\n");
             break;
-        case MSG_STATE:
+        case MSG_STATE: {
             // ctx->mode = CLIENT_PLAYING; here we cannot adjust mode otherwise pause won't work
             // todo update game state from payload
+            const GameRenderState state = {
+                .width = 40,
+                .height = 20,
+                .score = 100,
+                .time_remaining = 25,
+                .snake_count = 0,
+                .snakes = NULL,
+                .fruit_count = 0,
+                .fruits = NULL,
+                .obstacle_count = 0,
+                .obstacles = NULL
+            };
+            ctx->game = state;
+            log_client("msg state received\n");
             break;
-        case MSG_TIME:
+        }
+        case MSG_TIME: {
+            int time;
             msg_to_time(&msg, &time);
-            ctx->time_remaining = time;
+            ctx->game.time_remaining = time;
+            log_client("msg time received\n");
             break;
-        case MSG_ERROR:
+        }
+        case MSG_ERROR: {
+            char error_msg;
+            msg_to_error(&msg, &error_msg);
+
+            log_client("msg error received: %c\n");
+
             ctx->mode = CLIENT_MENU;
+
             snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
-                 "Error from server: %.*s", msg.payload_size, (char *)msg.payload);
+                 "Error from server: %c", error_msg);
             clear_menus_stack(&ctx->menus);
             menu_push(&ctx->menus, &ctx->error_menu);
             break;
+        }
         default:
             break;
 
@@ -524,6 +555,7 @@ void handle_text_input(ClientContext *ctx, const Key key) {
 
 // thread functions
 
+
 void *read_input_thread(void *arg) {
     const InputThreadArgs *args = arg;
 
@@ -535,22 +567,126 @@ void *read_input_thread(void *arg) {
     return NULL;
 }
 
+
+/*
+void *read_input_thread(void *arg) {
+    const InputThreadArgs *args = arg;
+
+    ClientInputQueue *queue = args->queue;
+    const _Atomic bool *running = args->running;
+
+    const int timeout_ms = 100;
+    struct pollfd pfd = {
+        .fd = 0,          // stdin or your input fd
+        .events = POLLIN,
+        .revents = 0
+    };
+
+    while (*running) {
+        pfd.revents = 0;
+
+        int ret = poll(&pfd, 1, timeout_ms);
+        if (ret < 0) {
+            // optional: log error
+            continue;
+        }
+        if (ret == 0) {
+            // timeout, just re-check *running
+            continue;
+        }
+
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            // optional: handle input error / closed
+            continue;
+        }
+
+        if (pfd.revents & POLLIN) {
+            // should be a non-blocking / single-iteration read helper
+            read_keyboard_input(queue, running);
+        }
+    }
+
+    return NULL;
+}
+*/
+/*
 void *recv_server_thread(void *arg) {
     const ReceiveThreadArgs *args = arg;
 
-    const int socket_fd = args->socket_fd;
+    const int *socket_fd = args->socket_fd;
     ServerInputQueue *queue = args->queue;
     const _Atomic bool *running = args->running;
 
+    const int timeout_ms = 100;
+
     while (*running) {
         Message msg;
-        if (recv_message(socket_fd, &msg) < 0) {
+        if (*socket_fd < 0) {
+            // not yet connected
+            continue;
+        }
+
+        if (recv_message(*socket_fd, &msg) < 0) {
             // handle error, e.g. connection lost
             // TODO it should rather send event
             //break;
             continue;
         }
         enqueue_msg(queue, msg);
+    }
+
+    return NULL;
+}
+*/
+
+// improved version with poll and timeout to check running flag
+void *recv_server_thread(void *arg) {
+    const ReceiveThreadArgs *args = arg;
+
+    const int *socket_fd = args->socket_fd;
+    ServerInputQueue *queue = args->queue;
+    const _Atomic bool *running = args->running;
+
+    // timeout in milliseconds (e.g. 100 ms)
+    const int timeout_ms = 100;
+
+    while (*running) {
+        struct pollfd pfd;
+        pfd.fd = *socket_fd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+
+        if (*socket_fd < 0) {
+            // not yet connected, sleep a bit to avoid busy loop
+            sleepn(10000); // 100 ms
+
+            continue;
+        }
+
+        const int ret = poll(&pfd, 1, timeout_ms);
+        if (ret < 0) {
+            // error in poll; you might want to log and break or continue
+            continue;
+        } else if (ret == 0) {
+            // timeout: nothing to read, loop again so we can check *running
+            continue;
+        }
+
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            // connection error/closed
+            // TODO: set some error flag, or stop running
+            continue;
+        }
+
+        if (pfd.revents & POLLIN) {
+            Message msg;
+            if (recv_message(*socket_fd, &msg) < 0) {
+                // handle recv error (e.g. connection lost)
+                // TODO: send event or stop running
+                continue;
+            }
+            enqueue_msg(queue, msg);
+        }
     }
 
     return NULL;
