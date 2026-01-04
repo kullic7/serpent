@@ -8,7 +8,7 @@ typedef struct Client {
     int socket_fd;  // acts as unique identifier for client
     int time_joined;
     pthread_t thread;
-} Client;
+}   Client;
 
 typedef struct {
     Client **clients; // dynamic array of pointers to clients (safer memory management when shared)
