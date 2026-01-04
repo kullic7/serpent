@@ -92,7 +92,7 @@ void render_menu(const Menu *menu, const InputMode input_mode, const char *text_
 }
 
 
-void render_game(const GameRenderState state) {
+void render_game(const ClientGameStateSnapshot state) {
     TermSize ts;
     term_get_size(&ts);
 
@@ -109,17 +109,19 @@ void render_game(const GameRenderState state) {
     snprintf(score_str, sizeof(score_str), "%zu", state.score);
     draw_text(9, 1, score_str);
 
-    if (state.time_remaining >= 0) {
+    if (state.game_time_remaining >= 0) {
         draw_text(2, 2, "Remaining time:");
         char time_str[64];
-        snprintf(time_str, sizeof(time_str), "%ds", state.time_remaining);
+        snprintf(time_str, sizeof(time_str), "%ds", state.game_time_remaining);
         draw_text(18, 2, time_str);
     }
 
     // draw fruits
     for (size_t i = 0; i < state.fruit_count; ++i) {
-        const Position fruit = state.fruits[i];
-        draw_text(fruit.x + 2, fruit.y + 2, FRUIT_CHAR);
+        const Fruit fruit = state.fruits[i];
+        if (!fruit.active)
+            continue;
+        draw_text(fruit.pos.x + 2, fruit.pos.y + 2, FRUIT_CHAR);
     }
 
     // draw obstacles

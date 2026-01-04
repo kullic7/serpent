@@ -2,7 +2,7 @@
 #define SERPENT_RENDERER_H
 
 #include <stdlib.h>
-#include "game_types.h"
+#include "types.h"
 #include "menu.h"
 #include "context.h"
 
@@ -14,7 +14,7 @@ typedef struct {
 
 void render_menu(const Menu *menu, InputMode input_mode, const char *text_note,
     const char *text_buffer, size_t text_len);
-void render_game(GameRenderState state);
+void render_game(ClientGameStateSnapshot state);
 
 void term_clear(void);
 void term_home(void);

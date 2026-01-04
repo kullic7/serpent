@@ -65,11 +65,12 @@ void client_init(ClientContext *ctx) {
     //ctx->score = 0;
     //ctx->time_elapsed = 0;
 
-    const GameRenderState state = {
+    const ClientGameStateSnapshot state = {
         .width = 0,
         .height = 0,
         .score = 0,
-        .time_remaining = 0,
+        .game_time_remaining = 0,
+        .player_time_elapsed = 0,
         .snake_count = 0,
         .snakes = NULL,
         .fruit_count = 0,
@@ -469,28 +470,21 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
             log_client("msg game over received\n");
             break;
         case MSG_STATE: {
-            // ctx->mode = CLIENT_PLAYING; here we cannot adjust mode otherwise pause won't work
-            // todo update game state from payload
-            const GameRenderState state = {
-                .width = 40,
-                .height = 20,
-                .score = 100,
-                .time_remaining = 25,
-                .snake_count = 0,
-                .snakes = NULL,
-                .fruit_count = 0,
-                .fruits = NULL,
-                .obstacle_count = 0,
-                .obstacles = NULL
-            };
-            ctx->game = state;
+            ClientGameStateSnapshot new_state = {0};
+
+            if (msg_to_state(&msg, &new_state) == 0) {
+                snapshot_destroy(&ctx->game);   // free old
+                ctx->game = new_state;          // move ownership  TODO by value so is it ok ??????
+                log_client("game state updated\n");
+            }
+
             log_client("msg state received\n");
             break;
         }
         case MSG_TIME: {
             int time;
             msg_to_time(&msg, &time);
-            ctx->game.time_remaining = time;
+            ctx->game.game_time_remaining = time;
             log_client("msg time received\n");
             break;
         }

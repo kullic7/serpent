@@ -69,16 +69,6 @@ void on_input_file_entered(void *ctx_ptr, const char *path) {
     menu_push(&ctx->menus, &ctx->player_select_menu);
 }
 
-
-void on_game_over(void *ctx_ptr) {
-    ClientContext *ctx = ctx_ptr;
-
-    ctx->mode = CLIENT_GAME_OVER;
-
-    snprintf(ctx->game_over_menu.txt_fields[0].text, sizeof(ctx->game_over_menu.txt_fields[0].text),
-             "Game over. Your score is: %d", (int)ctx->game.score);
-}
-
 // used by very first client to spawn server and connect to it
 // single or multi player
 bool spawn_connect_create_server(ClientContext *ctx) {

@@ -2,7 +2,7 @@
 #define SERPENT_CONTEXT_H
 
 #include "menu.h"
-#include "game_types.h"
+#include "types.h"
 #include <sched.h>
 
 //------------------------
@@ -60,7 +60,7 @@ typedef struct {
     Menu error_menu;
 
     // current game state/rendering
-    GameRenderState game;
+    ClientGameStateSnapshot game;
     //int score;
     //int time_elapsed;
 
@@ -140,9 +140,5 @@ void on_time_entered(void *ctx_ptr, const char *text); // pushes menu
 void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path); // uses modifies net and mode
 void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path); // uses modifies net and mode
 void on_input_file_entered(void *ctx_ptr, const char *file_path); // uses game sub and pushes menu
-
-// low level event(msg) callbacks
-void on_game_over(void *ctx_ptr);
-void on_game_state(void *ctx_ptr, const GameRenderState *state);
 
 #endif //SERPENT_CONTEXT_H

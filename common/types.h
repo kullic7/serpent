@@ -34,16 +34,10 @@ typedef enum {
 typedef struct {
     Position *body; // dynamic array of positions
     size_t length;
-} RenderSnake;
-
-
-typedef struct {
-    Position *body; // dynamic array of positions
-    size_t length;
     size_t capacity;
     Direction direction;     // UP, DOWN, LEFT, RIGHT
     Direction next_direction;
-    bool alive; // maybe it should be active instead
+    //bool alive; // maybe it should be active instead
 } Snake;
 
 typedef struct {
@@ -51,6 +45,7 @@ typedef struct {
     Snake snake;
     size_t score;
     bool paused;
+    bool resume_ev_pending;
     Timer timer;
 } Player;
 
@@ -63,21 +58,34 @@ typedef struct {
     Position pos;
 } Obstacle;
 
+
+// snapshot types for network and client rendering
+// over wire stable (static) arrays
+typedef struct {
+    Position *body;
+    size_t length;
+} SnakeSnapshot;
+
 typedef struct {
     int width;
     int height;
 
-    size_t score;
-    int time_remaining; // in seconds, -1 means no limit
+    size_t score; // for particular player
+    int player_time_elapsed; // for particular player in seconds (time since joining game) -> show in game over menu
+
+    int game_time_remaining; // in seconds, global remaining time for timed mode, -1 means no limit
 
     size_t snake_count;
-    RenderSnake *snakes;
+    SnakeSnapshot *snakes;
 
     size_t fruit_count;
-    Position *fruits;
+    Fruit *fruits;
 
     size_t obstacle_count;
     Obstacle *obstacles;
-} GameRenderState;
+} ClientGameStateSnapshot;
+
+void snapshot_init(ClientGameStateSnapshot *st);
+void snapshot_destroy(ClientGameStateSnapshot *st);
 
 #endif //SERPENT_GAME_TYPES_H
