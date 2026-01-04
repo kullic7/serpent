@@ -3,14 +3,18 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/un.h>
-
+#include <signal.h>
 #include "registry.h"
 #include "server.h"
 #include "logging.h"
 #include "game.h"
 
-
 int main(int argc, char **argv) {
+
+    // globally ignore SIGPIPE to avoid crashes when writing to closed sockets
+    // this is desired on servers
+    signal(SIGPIPE, SIG_IGN);
+
     // game configuration comes as command line arguments
     // --------------------------------------------------------
     // todo maybe game/world size ... but how to sync with client ?

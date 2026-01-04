@@ -15,6 +15,7 @@ add_executable(serpent-client client/main.c
         common/timer.c
         common/logging.c
         common/protocol.c
+        common/types.c
 )
 
 target_include_directories(serpent-client PRIVATE
@@ -30,6 +31,7 @@ add_executable(serpent-server server/main.c
         common/timer.c
         common/logging.c
         common/protocol.c
+        common/types.c
 )
 
 target_include_directories(serpent-server PRIVATE
