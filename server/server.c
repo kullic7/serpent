@@ -440,6 +440,7 @@ void *action_thread(void *arg) {
         while (dequeue_action(aq, &act)) {
             exec_action(&act, eq, reg);
         }
+        sleepn(100L * 1000000L); // sleep 100 ms to avoid busy loop
     }
     log_server("THREAD: ACTION completed\n");
 
