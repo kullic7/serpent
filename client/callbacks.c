@@ -1,8 +1,12 @@
-#include "buttons.h"
-#include "context.h"
 #include <string.h>
-#include "protocol.h"
 #include <unistd.h>
+#include <sys/un.h>
+#include <limits.h>
+#include <stdio.h>
+#include "callbacks.h"
+#include "context.h"
+#include "protocol.h"
+#include "client.h"
 #include "logging.h"
 
 
@@ -22,8 +26,7 @@ void btn_exit_to_main_menu(void *ctx_ptr) {
         send_leave(ctx->socket_fd);
         log_client("send\n");
 
-        close(ctx->socket_fd);
-        ctx->socket_fd = -1;
+        disconnect_from_server(ctx);
     }
 
     ctx->mode = CLIENT_MENU;
@@ -151,4 +154,61 @@ void btn_cancel_awaiting(void *ctx_ptr) {
     ctx->mode = CLIENT_MENU;
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->main_menu);
+}
+
+void on_time_entered(void *ctx_ptr, const char *text) {
+    char *endptr = NULL;
+    long seconds = strtol(text, &endptr, 10);
+    if (endptr == text || *endptr != '\0' || seconds < 0 || seconds > INT_MAX) {
+        // handle invalid input, e.g. set a default or show an error
+        return;
+    }
+    ClientContext *ctx = ctx_ptr;
+    ctx->time_remaining = (int)seconds; // TODO validation
+
+    menu_push(&ctx->menus, &ctx->world_select_menu);
+}
+
+
+void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path) {
+    ClientContext *ctx = ctx_ptr;
+    strncpy(ctx->server_path, path, sizeof(ctx->server_path));
+
+    if (!spawn_connect_create_server(ctx)) {
+        ctx->mode = CLIENT_MENU;
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->error_menu);
+        return;
+    }
+
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->awaiting_menu);
+
+}
+
+void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path) {
+    ClientContext *ctx = ctx_ptr;
+    strncpy(ctx->server_path, path, sizeof(ctx->server_path));
+
+    if (!connect_to_server(ctx)) {
+        ctx->mode = CLIENT_MENU;
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+             "Error. Could not connect to server.");
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->error_menu);
+        return;
+    }
+
+    clear_menus_stack(&ctx->menus);
+    menu_push(&ctx->menus, &ctx->awaiting_menu);
+
+}
+
+
+void on_input_file_entered(void *ctx_ptr, const char *path) {
+    ClientContext *ctx = ctx_ptr;
+
+    strncpy(ctx->file_path, path, sizeof(ctx->file_path));
+
+    menu_push(&ctx->menus, &ctx->player_select_menu);
 }

@@ -3,9 +3,7 @@
 
 #include "menu.h"
 #include "types.h"
-#include <sched.h>
-
-//------------------------
+#include "input.h"
 
 
 typedef enum {
@@ -17,12 +15,6 @@ typedef enum {
     CLIENT_ERROR,
     CLIENT_GAME_OVER,
 } ClientMode;
-
-typedef enum {
-    INPUT_TEXT, // text mode
-    INPUT_GAME, // game mode for keys/directions
-    INPUT_DISPLAY, // just arbitrary display mode
-} InputMode;
 
 typedef enum {
     GAME_SINGLE,
@@ -61,8 +53,6 @@ typedef struct {
 
     // current game state/rendering
     ClientGameStateSnapshot game;
-    //int score;
-    //int time_elapsed;
 
     // game configuration options
     int time_remaining; // in seconds, -1 means no limit
@@ -72,73 +62,5 @@ typedef struct {
     bool random_world_enabled; // random | from file
 
 } ClientContext;
-
-// --------------
-/*
-typedef struct {
-    int socket_fd;
-    char server_path[512];
-} NetworkState;
-
-typedef struct {
-    InputMode mode;
-    char note[128];
-    char buffer[128];
-    size_t len;
-    void (*on_submit)(void *ctx, const char *text);
-} InputState;
-
-typedef struct {
-    MenuStack stack;
-
-    Menu main_menu;
-    Menu mode_select_menu;
-    Menu world_select_menu;
-    Menu load_menu;
-    Menu pause_menu;
-    Menu game_over_menu;
-    Menu awaiting_menu;
-} MenuState;
-
-typedef struct {
-    int score;
-    GameRenderState render;
-} GameState;
-
-typedef struct {
-    volatile bool running;
-    GameMode mode;
-    int time_remaining; // in seconds, -1 means no limit
-    char file_path[128];
-} GameConfig;
-
-// single source of truth for client state
-typedef struct {
-    NetworkState net;
-    InputState input;
-    MenuState menus;
-    GameState game;
-    ClientMode mode;
-    GameConfig config;
-} ClientContext2;
-*/
-
-// helpers
-bool connect_to_server(ClientContext *ctx); // should modify just net subctx
-bool wait_for_server_socket(const char *path, int timeout_ms);
-void disconnect_from_server(ClientContext *ctx); // should modify just net subctx
-
-bool spawn_connect_create_server(ClientContext *ctx); // should modify just net subctx
-
-bool spawn_server_process(ClientContext *ctx); // should modify just net subctx
-
-void poll_server_exit(ClientContext *ctx);
-
-void setup_input(ClientContext *ctx, const char *note);
-
-void on_time_entered(void *ctx_ptr, const char *text); // pushes menu
-void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path); // uses modifies net and mode
-void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path); // uses modifies net and mode
-void on_input_file_entered(void *ctx_ptr, const char *file_path); // uses game sub and pushes menu
 
 #endif //SERPENT_CONTEXT_H

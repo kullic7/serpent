@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "types.h"
 #include "menu.h"
-#include "context.h"
+#include "input.h"
 
 typedef struct {
     int cols;

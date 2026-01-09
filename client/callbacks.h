@@ -1,7 +1,9 @@
-#ifndef SERPENT_BUTTONS_H
-#define SERPENT_BUTTONS_H
+#ifndef SERPENT_CALLBACKS_H
+#define SERPENT_CALLBACKS_H
 
 // button actions/callbacks
+
+// TODO buttons should rather emit events and not modify context directly
 
 void btn_resume_game(void *ctx_ptr);
 void btn_exit_to_main_menu(void *ctx_ptr);
@@ -26,4 +28,9 @@ void btn_load_from_file(void *ctx_ptr);
 
 void btn_cancel_awaiting(void *ctx_ptr);
 
-#endif //SERPENT_BUTTONS_H
+void on_time_entered(void *ctx_ptr, const char *text);
+void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path);
+void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path);
+void on_input_file_entered(void *ctx_ptr, const char *path);
+
+#endif //SERPENT_CALLBACKS_H

@@ -8,8 +8,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 add_executable(serpent-client client/main.c
         client/client.c
         client/renderer.c
-        client/buttons.c
-        client/context.c
+        client/callbacks.c
         client/menu.c
         client/input.c
         common/timer.c

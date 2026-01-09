@@ -19,6 +19,11 @@ typedef struct ServerInputQueue {
     pthread_cond_t not_full;
 } ServerInputQueue;
 
+typedef enum {
+    INPUT_TEXT, // text mode
+    INPUT_KEY, // key mode
+} InputMode;
+
 void client_input_queue_init(ClientInputQueue *q);
 void client_input_queue_destroy(ClientInputQueue *q);
 

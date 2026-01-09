@@ -4,33 +4,40 @@
 #include "input.h"
 #include "context.h"
 
+// client lifecycle
 void client_init(ClientContext *ctx);
-
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq);
-
 void client_cleanup(ClientContext *ctx);
 
+// infrastructure
+bool connect_to_server(ClientContext *ctx);
+bool wait_for_server_socket(const char *path, int timeout_ms);
+void disconnect_from_server(ClientContext *ctx);
+bool spawn_server_process(ClientContext *ctx);
+bool spawn_connect_create_server(ClientContext *ctx);
+void poll_server_exit(ClientContext *ctx);
+
+// menu initializers
 static void init_menu_fields(Menu *menu, Button *buttons, size_t b_count,
     TextField *txt_fields, size_t t_count, ClientContext *ctx);
 
-void init_main_menu(Menu *menu, ClientContext *ctx);
-void init_pause_menu(Menu *menu, ClientContext *ctx);
-
-void init_mode_select_menu(Menu *menu, ClientContext *ctx);
-void init_world_select_menu(Menu *menu, ClientContext *ctx);
-void init_load_menu(Menu *menu, ClientContext *ctx);
-void init_player_select_menu(Menu *menu, ClientContext *ctx);
-
-void init_game_over_menu(Menu *menu, ClientContext *ctx);
-
-void init_awaiting_menu(Menu *menu, ClientContext *ctx);
-void init_error_menu(Menu *menu, ClientContext *ctx);
+void init_main_menu(ClientContext *ctx);
+void init_pause_menu(ClientContext *ctx);
+void init_mode_select_menu(ClientContext *ctx);
+void init_world_select_menu(ClientContext *ctx);
+void init_load_menu(ClientContext *ctx);
+void init_player_select_menu(ClientContext *ctx);
+void init_game_over_menu(ClientContext *ctx);
+void init_awaiting_menu(ClientContext *ctx);
+void init_error_menu(ClientContext *ctx);
 
 // input handlers
-void handle_menu_key(Menu *menu, Key key); // should modify only menu subctx
-void handle_game_key(Key key, ClientContext *ctx); // should map key to direction and send to server ... menu, Key, mode
-void handle_server_msg(ClientContext *ctx, Message msg); // should modify game sub context
-void handle_text_input(ClientContext *ctx, Key key); // should modify oly input sub context
+void handle_menu_key(Menu *menu, Key key);
+void handle_game_key(ClientContext *ctx, Key key);
+void handle_server_msg(ClientContext *ctx, Message msg);
+void handle_text_input(ClientContext *ctx, Key key);
+
+void setup_input(ClientContext *ctx, const char *note);
 
 // thread functions
 
