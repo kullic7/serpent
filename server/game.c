@@ -94,6 +94,12 @@ void game_snapshot_each_client(const GameState *game, ActionQueue *aq) {
             snapshot->obstacles[j] = game->obstacles[j];
         }
 
+        if (!snapshot->snakes || !snapshot->fruits || !snapshot->obstacles) {
+            snapshot_destroy(snapshot);
+            free(snapshot);
+            continue;
+        }
+
         act.u.game.state = snapshot;      // pointer, no copy
 
         enqueue_action(aq, act);
@@ -107,7 +113,23 @@ int broadcast_game_state(ClientRegistry *reg, const ActArgGameState game) {
     pthread_mutex_lock(&reg->lock);
     for (size_t i = 0; i < reg->count; ++i) {
         if (send_state(reg->clients[i]->socket_fd, game.state) < 0) {
-            log_server("failed to send game state to client\n");
+            log_server("FAILED: to send game state to client\n");
+            rc = -1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&reg->lock);
+
+    return rc;
+}
+
+int broadcast_game_over(ClientRegistry *reg) {
+
+    int rc = 0;
+    pthread_mutex_lock(&reg->lock);
+    for (size_t i = 0; i < reg->count; ++i) {
+        if (send_game_over(reg->clients[i]->socket_fd) < 0) {
+            log_server("FAILED: to send game over to client\n");
             rc = -1;
             break;
         }
@@ -308,7 +330,7 @@ void game_add_fruit(GameState *game) {
 
     if (game->fruit_count >= MAX_FRUITS) return;
 
-    Fruit f;
+    Fruit f = {0};
     f.pos.x = rand() % game->width;
     f.pos.y = rand() % game->height;
     f.active = true;

@@ -29,6 +29,7 @@ void game_destroy(const GameState *game);
 
 void game_snapshot_each_client(const GameState *game, ActionQueue *aq);
 int broadcast_game_state(ClientRegistry *reg, ActArgGameState game);
+int broadcast_game_over(ClientRegistry *reg);
 
 void game_add_player(GameState *game, int player_id);
 void game_remove_player(GameState *game, int player_id);

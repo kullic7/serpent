@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     const int listen_fd = setup_server_socket(socket_path);
 
     if (listen_fd < 0) {
-        log_server("failed to set up server socket\n");
+        log_server("FAILED: to set up server socket\n");
         exit(1); // client fails on timeout
     }
 
@@ -74,22 +74,23 @@ int main(int argc, char **argv) {
     action_queue_init(&actions);
 
     pthread_t accept_thread;
+    RecvInputThreadArgs recv_args = {&events, -1, &running}; // client_fd will be set in accept_connection
+    AcceptLoopThreadArgs args = {&registry, listen_fd, &accepting, &recv_args};
+
+    // accept very first connection in main thread to avoid race
+    if (accept_connection(&registry, listen_fd, &recv_args) == -1) error=true; // blocking call; accept one and return
     if (single_player) {
-        // in single player no extra thread needed
-        RecvInputThreadArgs args = {&events, -1, &running}; // client_fd will be set in accept_connection
-        if (accept_connection(&registry, listen_fd, &args) == -1) error=true; // blocking call; accept one and return
         log_server("not accepting any more messages \n");
         close(listen_fd);
         unlink(socket_path);
     } else {
         log_server("MULTIPLAYER\n");
         // in multiplayer spawn accept thread
-        RecvInputThreadArgs recv_args = {&events, -1, &running};
-        AcceptLoopThreadArgs args = {&registry, listen_fd, &accepting, &recv_args};
+
         const int rc = pthread_create(&accept_thread, NULL, accept_loop_thread, &args);
         if (rc != 0) {
             // handle error
-            log_server("failed to start accepting THREAD \n");
+            log_server("FAILED: to start accepting THREAD \n");
             close(listen_fd);
             unlink(socket_path);
             exit(1); // client fails on timeout
@@ -103,7 +104,7 @@ int main(int argc, char **argv) {
     const int rc = pthread_create(&worker_thread, NULL, action_thread, &worker_args);
     if (rc != 0) {
         // handle error
-        log_server("failed to start worker THREAD \n");
+        log_server("FAILED: to start worker THREAD \n");
         running = false;
         pthread_join(worker_thread, NULL);
         close(listen_fd);
@@ -119,23 +120,30 @@ int main(int argc, char **argv) {
 
     game_run(game_time >= 0, single_player, &state, &events, &actions);
 
+
+    // shutdown
+    // --------------------------------------------------------
     log_server("game loop ended\n");
 
-    //broadcast_game_over(); // TODO must be done here before shutdown so we are sure all clients get it
+    broadcast_game_over(&registry); // must be done here before shutdown so we are sure all clients get it (its blocking)
+    log_server("game over broadcasted to clients\n");
 
     accepting = false;
     running = false;
-
-    registry_destroy(&registry); // joins all client threads
-
-    event_queue_destroy(&events);
-    action_queue_destroy(&actions);
 
     game_destroy(&state);
 
     log_server("game destroyed\n");
 
     pthread_join(worker_thread, NULL);
+    log_server("worker thread joined\n");
+
+    registry_destroy(&registry); // joins all client threads
+    log_server("registry destroyed (client recv input thread should be joined)\n");
+
+    event_queue_destroy(&events);
+    action_queue_destroy(&actions);
+    log_server("event queues destroyed\n");
 
     if (!single_player) {
         pthread_join(accept_thread, NULL);

@@ -23,8 +23,9 @@ void btn_exit_to_main_menu(void *ctx_ptr) {
 
     if (ctx->socket_fd >= 0) {
         log_client("sending leave message to server\n");
-        send_leave(ctx->socket_fd);
-        log_client("send\n");
+        if (send_leave(ctx->socket_fd) < 0) {
+            log_client("FAILED: to send leave\n");
+        } else log_client("send\n");
 
         disconnect_from_server(ctx);
     }
@@ -61,8 +62,9 @@ void btn_resume_game(void *ctx_ptr) {
     menu_pop(&ctx->menus);
 
     log_client("sending resume message to server\n");
-    send_resume(ctx->socket_fd);
-    log_client("send\n");
+    if (send_resume(ctx->socket_fd) < 0) {
+        log_client("FAILED: to send resume\n");
+    } else log_client("send\n");
 
     ctx->mode = CLIENT_PLAYING;
 }
@@ -147,24 +149,36 @@ void btn_load_from_file(void *ctx_ptr) {
 void btn_cancel_awaiting(void *ctx_ptr) {
     ClientContext *ctx = ctx_ptr;
 
+    // send leave must precede disconnect
     log_client("send leave message to server\n");
-    send_leave(ctx->socket_fd);
-    log_client("send\n");
+    if (send_leave(ctx->socket_fd) < 0) {
+        log_client("FAILED: to send leave\n");
+    } else log_client("send\n");
+
+    disconnect_from_server(ctx);
 
     ctx->mode = CLIENT_MENU;
     clear_menus_stack(&ctx->menus);
     menu_push(&ctx->menus, &ctx->main_menu);
 }
 
+// text input handling callbacks
+
 void on_time_entered(void *ctx_ptr, const char *text) {
+    ClientContext *ctx = ctx_ptr;
+
     char *endptr = NULL;
-    long seconds = strtol(text, &endptr, 10);
+    const long seconds = strtol(text, &endptr, 10);
+
     if (endptr == text || *endptr != '\0' || seconds < 0 || seconds > INT_MAX) {
-        // handle invalid input, e.g. set a default or show an error
+        snprintf(ctx->error_menu.txt_fields[0].text,
+             sizeof(ctx->error_menu.txt_fields[0].text),
+             "Invalid time. Enter a non\-negative integer.");
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->error_menu);
         return;
     }
-    ClientContext *ctx = ctx_ptr;
-    ctx->time_remaining = (int)seconds; // TODO validation
+    ctx->time_remaining = (int)seconds;
 
     menu_push(&ctx->menus, &ctx->world_select_menu);
 }
@@ -209,6 +223,20 @@ void on_input_file_entered(void *ctx_ptr, const char *path) {
     ClientContext *ctx = ctx_ptr;
 
     strncpy(ctx->file_path, path, sizeof(ctx->file_path));
+
+    ctx->file_path[sizeof(ctx->file_path) - 1] = '\0';
+
+    // client side check if file exists (possible because client and server are on same machine)
+    if (access(ctx->file_path, F_OK) != 0) {
+        snprintf(ctx->error_menu.txt_fields[0].text,
+                 sizeof(ctx->error_menu.txt_fields[0].text),
+                 "Error. File does not exist on machine.");
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->error_menu);
+        return;
+    }
+
+
 
     menu_push(&ctx->menus, &ctx->player_select_menu);
 }

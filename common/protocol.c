@@ -1,6 +1,7 @@
 #include "protocol.h"
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <arpa/inet.h>
 
 // message framing ... sockets are byte streams
@@ -9,8 +10,16 @@ static int send_all(const int fd, const void *buf, const size_t size) {
     size_t sent = 0;
     while (sent < size) {
         const ssize_t n = send(fd, (const char *)buf + sent, size - sent, 0);
-        if (n <= 0) return -1;
-        sent += (size_t)n;
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            if (errno == EPIPE || errno == ECONNRESET) {
+                // peer disconnected
+                return -1;
+            }
+            return -1;
+        }
+        sent += n;
     }
     return 0;
 }
@@ -175,7 +184,7 @@ int send_state(const int fd, const ClientGameStateSnapshot *st) {
     payload_size += st->fruit_count    * sizeof(Fruit);
     payload_size += st->obstacle_count * sizeof(Obstacle);
 
-    void *buf = malloc(payload_size);
+    void *buf = calloc(1, payload_size);
     if (!buf) return -1;
 
 
@@ -237,7 +246,7 @@ int msg_to_state(const Message *msg, ClientGameStateSnapshot *st) {
 
     const uint8_t *p = msg->payload;
 
-    GameStateWireHeader h;
+    GameStateWireHeader h = {0};
     memcpy(&h, p, sizeof(h));
     p += sizeof(h);
 
@@ -260,6 +269,11 @@ int msg_to_state(const Message *msg, ClientGameStateSnapshot *st) {
         st->snakes[i].length = len;
         st->snakes[i].body = malloc(len * sizeof(Position));
 
+        if (!st->snakes[i].body) {
+            snapshot_destroy(st);
+            return -1;
+        }
+
         memcpy(st->snakes[i].body, p, len * sizeof(Position));
         p += len * sizeof(Position);
     }
@@ -267,8 +281,10 @@ int msg_to_state(const Message *msg, ClientGameStateSnapshot *st) {
     st->fruits    = malloc(h.fruit_count * sizeof(Fruit));
     st->obstacles = malloc(h.obstacle_count * sizeof(Obstacle));
 
-    if (!st->snakes || !st->fruits || !st->obstacles)
+    if (!st->snakes || !st->fruits || !st->obstacles) {
+        snapshot_destroy(st);
         return -1;
+    }
 
     st->fruit_count  = h.fruit_count;
     st->obstacle_count = h.obstacle_count;

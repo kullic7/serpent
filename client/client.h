@@ -16,6 +16,7 @@ void disconnect_from_server(ClientContext *ctx);
 bool spawn_server_process(ClientContext *ctx);
 bool spawn_connect_create_server(ClientContext *ctx);
 void poll_server_exit(ClientContext *ctx);
+void handle_server_disconnect(ClientContext *ctx);
 
 // menu initializers
 static void init_menu_fields(Menu *menu, Button *buttons, size_t b_count,

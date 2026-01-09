@@ -2,6 +2,8 @@
 #include "timer.h"
 #include <time.h>
 
+#include "logging.h"
+
 void sleepn(const long nanoseconds) {
     struct timespec ts;
     ts.tv_sec = 0;

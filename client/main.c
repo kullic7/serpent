@@ -1,9 +1,13 @@
-#include "client.h"
 #include <unistd.h>
-
+#include <signal.h>
+#include "client.h"
 #include "logging.h"
 
 int main(int argc, char *argv[]) {
+    // globally ignore SIGPIPE to avoid crashes when writing to closed sockets
+    // this is desired on socket architecture
+    signal(SIGPIPE, SIG_IGN);
+
     ClientContext ctx;
 
     log_client("____ SERPENT CLIENT STARTING ____\n");

@@ -18,9 +18,10 @@
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) {
     while (ctx->running) {
 
+        // reaping server process if exited so we do not create zombies
         poll_server_exit(ctx);
 
-        // TODO signal handling for graceful exit e.g. game time elapsed on server side
+        // TODO setup timeout/retry for awaiting menu
         // e.g. servers game over, here we need to recv
         // async processing of keyboard signals, when too many we drop them
         Key key;
@@ -103,6 +104,8 @@ void client_cleanup(ClientContext *ctx) {
 
     disconnect_from_server(ctx);
 
+    snapshot_destroy(&ctx->game);
+
     term_show_cursor();
     term_clear();
     term_home();
@@ -183,11 +186,12 @@ void poll_server_exit(ClientContext *ctx) {
         return;
 
     int status;
-    pid_t r = waitpid(ctx->server_pid, &status, WNOHANG);
+    const pid_t r = waitpid(ctx->server_pid, &status, WNOHANG);
 
     if (r == ctx->server_pid) {
         ctx->server_pid = -1; // server is gone
-        // handle server exit
+        handle_server_disconnect(ctx);
+        log_client("SERVER DISCONNECTED handled\n");
     }
 }
 
@@ -245,6 +249,19 @@ void disconnect_from_server(ClientContext *ctx) {
         close(ctx->socket_fd);
         ctx->socket_fd = -1;
     }
+}
+
+void handle_server_disconnect(ClientContext *ctx) {
+    disconnect_from_server(ctx);
+
+    if (ctx->mode == CLIENT_PLAYING || ctx->mode == CLIENT_PAUSED) {
+        ctx->mode = CLIENT_MENU;
+        snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
+         "Error. Disconnected from server.");
+        clear_menus_stack(&ctx->menus);
+        menu_push(&ctx->menus, &ctx->error_menu);
+    }
+
 }
 
 void init_main_menu(ClientContext *ctx) {
@@ -462,7 +479,7 @@ void init_awaiting_menu(ClientContext *ctx) {
     static Button buttons[] = {
         {
             .text = "Cancel",
-            .on_press = btn_cancel_awaiting, // TODO it should be real cancel action ... like notify server, destroy process etc
+            .on_press = btn_cancel_awaiting,
             .user_data = NULL
         }
     };
@@ -527,12 +544,13 @@ void handle_game_key(ClientContext *ctx, const Key key) {
         ctx->mode = CLIENT_PAUSED;
 
         log_client("sending message paused to server\n");
-        send_pause(ctx->socket_fd);
-        log_client("send\n");
+        if (send_pause(ctx->socket_fd) < 0) {
+            log_client("FAILED: to send paused\n");
+        } else log_client("send\n");
 
         clear_menus_stack(&ctx->menus);
         snprintf(ctx->pause_menu.txt_fields[0].text, sizeof(ctx->pause_menu.txt_fields[0].text),
-             "Your current score is: %d", (int)ctx->game.score);
+             "Your current score is: %d Time in game is: %d s", (int)ctx->game.score, ctx->game.player_time_elapsed);
         menu_push(&ctx->menus, &ctx->pause_menu);
     }
 
@@ -555,8 +573,9 @@ void handle_game_key(ClientContext *ctx, const Key key) {
     }
 
     log_client("sending direction to server\n");
-    send_input(ctx->socket_fd, dir);
-    log_client("send\n");
+    if (send_input(ctx->socket_fd, dir) < 0) {
+        log_client("FAILED: to send direction\n");
+    } else log_client("send\n");
 }
 
 void handle_server_msg(ClientContext *ctx, const Message msg) {
@@ -573,8 +592,11 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
         case MSG_GAME_OVER:
             ctx->mode = CLIENT_GAME_OVER;
 
+            clear_menus_stack(&ctx->menus);
+            menu_push(&ctx->menus, &ctx->game_over_menu);
+
             snprintf(ctx->game_over_menu.txt_fields[0].text, sizeof(ctx->game_over_menu.txt_fields[0].text),
-                     "Game over. Your score is: %d", (int)ctx->game.score);
+                     "Game over. Your score is: %d Time in game is: %d s", (int)ctx->game.score, ctx->game.player_time_elapsed);
             log_client("msg game over received\n");
             break;
         case MSG_STATE: {
@@ -584,6 +606,9 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
                 snapshot_destroy(&ctx->game);   // free old
                 ctx->game = new_state;          // move ownership  TODO by value so is it ok ??????
                 log_client("game state updated\n");
+            } else {
+                snapshot_destroy(&new_state);
+                log_client("FAILED: to parse state message\n");
             }
 
             log_client("msg state received\n");
@@ -656,7 +681,6 @@ void handle_text_input(ClientContext *ctx, const Key key) {
 }
 
 // thread functions
-
 
 void *read_input_thread(void *arg) {
     const InputThreadArgs *args = arg;
@@ -760,7 +784,7 @@ void *recv_server_thread(void *arg) {
 
         if (*socket_fd < 0) {
             // not yet connected, sleep a bit to avoid busy loop
-            sleepn(10000); // 100 ms
+            sleepn((long)timeout_ms * 1000000L); // 100 ms
 
             continue;
         }

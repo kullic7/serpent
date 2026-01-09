@@ -1,16 +1,17 @@
 #include "events.h"
 #include <pthread.h>
 #include "logging.h"
+#include <assert.h>
 
 void event_queue_init(EventQueue *q) {
     q->count = 0;
     int rc = pthread_mutex_init(&q->lock, NULL);
     if (rc != 0) {
-        // handle error
+        log_server("FAILED: to init event queue mutex\n");
     }
     rc = pthread_cond_init(&q->not_full, NULL);
     if (rc != 0) {
-        // handle error
+        log_server("FAILED: to init event queue mutex\n");
     }
 }
 
@@ -20,6 +21,7 @@ void event_queue_destroy(EventQueue *q) {
 }
 
 void enqueue_event(EventQueue *q, const Event ev) {
+    assert(q != NULL);
     pthread_mutex_lock(&q->lock);
     if (q->count >= MAX_EVENTS) {
         log_server("event queue full\n");
@@ -54,11 +56,11 @@ void action_queue_init(ActionQueue *q) {
     q->count = 0;
     int rc = pthread_mutex_init(&q->lock, NULL);
     if (rc != 0) {
-        // handle error
+        log_server("FAILED: to init action queue mutex\n");
     }
     rc = pthread_cond_init(&q->not_full, NULL);
     if (rc != 0) {
-        // handle error
+        log_server("FAILED: to init action queue mutex\n");
     }
 }
 

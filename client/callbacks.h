@@ -28,6 +28,7 @@ void btn_load_from_file(void *ctx_ptr);
 
 void btn_cancel_awaiting(void *ctx_ptr);
 
+// text input handling callbacks
 void on_time_entered(void *ctx_ptr, const char *text);
 void on_socket_path_entered_when_creating(void *ctx_ptr, const char *path);
 void on_socket_path_entered_when_joining(void *ctx_ptr, const char *path);

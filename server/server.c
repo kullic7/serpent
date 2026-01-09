@@ -1,6 +1,6 @@
 #include "server.h"
 #include "logging.h"
-
+#include "timer.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -9,8 +9,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <poll.h>
+#include <errno.h>
 
-#include "timer.h"
 
 
 int setup_server_socket(const char *path) {
@@ -57,9 +57,10 @@ int accept_connection(ClientRegistry *r, const int listen_fd, RecvInputThreadArg
     pthread_t input_thread;
     args->client_fd = client_fd;
 
-    int rc = pthread_create(&input_thread, NULL, recv_input_thread, args);
+    const int rc = pthread_create(&input_thread, NULL, recv_input_thread, args);
     if (rc != 0) {
         // handle error
+        log_server("FAILED: to start recv input THREAD \n");
         close(client_fd);
         return -1;
     }
@@ -88,6 +89,7 @@ bool handle_event(const Event *ev, ActionQueue *q, GameState *game) {
         case EV_CONNECTED:
             game_add_fruit(game);
             game_add_player(game, ev->u.player_id);
+            timer_start(&game->players[game->player_count - 1].timer);
 
             log_server("ev connected received\n");
             enqueue_action(q, (Action){ACT_SEND_READY, .u.player_id = ev->u.player_id});
@@ -220,7 +222,7 @@ void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg) {
             break;
         case ACT_SEND_READY:
             // send ready message to client act->u.player_id
-            if (send_ready(act->u.player_id) < 0) log_server("FAILED\n");
+            if (send_ready(act->u.player_id) < 0) log_server("FAILED: to send ready\n");
             log_server("act send ready executed\n");
             break;
         case ACT_SEND_GAME_OVER:
@@ -230,7 +232,7 @@ void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg) {
             break;
         case ACT_BROADCAST_GAME_STATE:
             // send game state act->u.state to all clients
-            broadcast_game_state(reg, act->u.game);
+            broadcast_game_state(reg, act->u.game); // TODO handle errors if needed
             snapshot_destroy(act->u.game.state); // free dynamic arrays inside
             free(act->u.game.state); // free the struct itself
             log_server("act send broadcast game state executed\n");
@@ -319,6 +321,26 @@ int msg_to_event(const Message *msg, const int client_fd, Event *ev) {
 
 void game_run(const bool timed_mode, const bool single_player, GameState *game, EventQueue *eq, ActionQueue *aq) {
 
+    // wait for at least one player to connect
+    Timer timeout_timer;
+    timer_reset(&timeout_timer);
+    timer_set(&timeout_timer, 5); // 5 sec timeout for connection to avoid race condition with recv thread
+    timer_start(&timeout_timer);
+    while (true) {
+        // handle events (only EVENT_CONNECTED is relevant)
+        Event ev = {0};
+        while (dequeue_event(eq, &ev)) {
+            handle_event(&ev, aq, game);
+        }
+
+        if (game->player_count > 0) break; // at least one player connected
+        if (timer_expired(&timeout_timer)) {
+            log_server("timeout waiting for first player connection\n");
+            return; // timeout waiting for first player
+        }
+    }
+
+    timer_start(&game->timer);
     while (true) {
 
         game_snapshot_each_client(game, aq);
@@ -466,13 +488,34 @@ void *recv_input_thread(void *arg) {
     pfd.fd = client_fd;
     pfd.events = POLLIN;
 
+    if (client_fd < 0) {
+        log_server("THREAD: RECEIVE waiting for valid client fd\n");
+    }
+
+    if (!eq) {
+        log_server("THREAD: RECEIVE no event queue provided\n");
+        return NULL;
+    }
+
     // first signal that client connected
     enqueue_event(eq, (Event){ .type = EV_CONNECTED, .u.player_id = client_fd });
+    log_server("THREAD: RECEIVE started for client fd\n");
 
     while (*running) {
-        int rc = poll(&pfd, 1, 100); // 100 ms timeout
+
+        if (client_fd < 0) {
+            // not yet connected, sleep a bit to avoid busy loop
+            sleepn(100L * 1000000L); // 100 ms
+            continue;
+        }
+
+        const int rc = poll(&pfd, 1, 100); // 100 ms timeout
         if (rc < 0) {
+            if (errno == EINTR) {
+                continue; // interrupted by signal, retry
+            }
             log_server("FAILED: poll\n");
+            enqueue_event(eq, (Event){ .type = EV_DISCONNECTED, .u.player_id = client_fd });
             break;
         } else if (rc == 0) {
             // timeout, just continue to re-check *running
@@ -480,7 +523,8 @@ void *recv_input_thread(void *arg) {
         }
 
         if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
-            log_server("poll: socket error/hangup\n");
+            log_server("FAILED: poll: socket error/hangup\n");
+            enqueue_event(eq, (Event){ .type = EV_DISCONNECTED, .u.player_id = client_fd });
             break;
         }
 
