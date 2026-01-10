@@ -1,36 +1,10 @@
-#define _POSIX_C_SOURCE 199309L
 #include "config.h"
 #include "renderer.h"
-#include <time.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "timer.h"
 
-void sleep_frame() {
-    static struct timespec last_frame = {0};
-    struct timespec current_time, sleep_time;
-    long elapsed_ms, sleep_ms;
-
-    clock_gettime(CLOCK_MONOTONIC, &current_time);
-
-    if (last_frame.tv_sec == 0 && last_frame.tv_nsec == 0) {
-        last_frame = current_time;
-        return;
-    }
-
-    elapsed_ms = (current_time.tv_sec - last_frame.tv_sec) * 1000 +
-                 (current_time.tv_nsec - last_frame.tv_nsec) / 1000000;
-
-    sleep_ms = FRAME_TIME_MS - elapsed_ms;
-
-    if (sleep_ms > 0) {
-        sleep_time.tv_sec = sleep_ms / 1000;
-        sleep_time.tv_nsec = (sleep_ms % 1000) * 1000000;
-        nanosleep(&sleep_time, NULL);
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &last_frame);
-}
 
 void term_clear(void) {
     printf("\033[2J");
@@ -114,11 +88,11 @@ void render_menu(const Menu *menu, const InputMode input_mode, const char *text_
 
     fflush(stdout);
 
-    sleep_frame();
+    sleep_frame(FRAME_TIME_MS);
 }
 
 
-void render_game(const GameRenderState *state) {
+void render_game(const ClientGameStateSnapshot state) {
     TermSize ts;
     term_get_size(&ts);
 
@@ -127,47 +101,51 @@ void render_game(const GameRenderState *state) {
     term_hide_cursor();
 
     // draw borders
-    draw_box(75, 5, state->width + 1, state->height + 1);
+    draw_box(WORLD_X_OFFSET, WORLD_Y_OFFSET, state.width + 1, state.height + 1);
 
     // draw score and time
     draw_text(2, 1, "Score:");
     char score_str[32];
-    snprintf(score_str, sizeof(score_str), "%zu", state->score);
+    snprintf(score_str, sizeof(score_str), "%zu", state.score);
     draw_text(9, 1, score_str);
 
-    if (state->time_remaining >= 0) {
+    draw_text(2, 2, "Remaining time:");
+    if (state.game_time_remaining >= 0) {
         draw_text(2, 2, "Remaining time:");
         char time_str[64];
-        snprintf(time_str, sizeof(time_str), "%ds", state->time_remaining);
+        snprintf(time_str, sizeof(time_str), "%ds", state.game_time_remaining);
         draw_text(18, 2, time_str);
+    } else {
+        draw_text(2, 2, "Remaining time: Inf s");
     }
 
     // draw fruits
-    for (size_t i = 0; i < state->fruit_count; ++i) {
-        Position fruit = state->fruits[i];
-        draw_text(fruit.x + 2, fruit.y + 2, FRUIT_CHAR);
+    for (size_t i = 0; i < state.fruit_count; ++i) {
+        const Fruit fruit = state.fruits[i];
+        if (!fruit.active)
+            continue;
+        draw_text(fruit.pos.x + WORLD_X_OFFSET, fruit.pos.y + WORLD_Y_OFFSET, FRUIT_CHAR);
     }
 
     // draw obstacles
-    for (size_t i = 0; i < state->obstacle_count; ++i) {
-        Obstacle obstacle = state->obstacles[i];
-        draw_text(obstacle.pos.x + 2, obstacle.pos.y + 2, OBSTACLE_CHAR);
+    for (size_t i = 0; i < state.obstacle_count; ++i) {
+        const Obstacle obstacle = state.obstacles[i];
+        draw_text(obstacle.pos.x + WORLD_X_OFFSET, obstacle.pos.y + WORLD_Y_OFFSET, OBSTACLE_CHAR);
     }
 
     // draw snakes
-    for (size_t i = 0; i < state->snake_count; ++i) {
-        const Position head = state->snakes[i].body[0];
-        draw_text(head.x + 2, head.y + 2, "O");
-        for (size_t j = 0; j < state->snakes[i].length; ++j) {
-            Position body = state->snakes[i].body[j];
-            draw_text(body.x + 2, body.y + 2, SNAKE_CHAR);
+    for (size_t i = 0; i < state.snake_count; ++i) {
+        const Position head = state.snakes[i].body[0];
+        draw_text(head.x + WORLD_X_OFFSET, head.y + WORLD_Y_OFFSET, "@");
+        for (size_t j = 1; j < state.snakes[i].length; ++j) {
+            const Position body = state.snakes[i].body[j];
+            draw_text(body.x + WORLD_X_OFFSET, body.y + WORLD_Y_OFFSET, SNAKE_CHAR);
         }
     }
 
-
     fflush(stdout);
 
-    sleep_frame();
+    sleep_frame(FRAME_TIME_MS);
 }
 
 

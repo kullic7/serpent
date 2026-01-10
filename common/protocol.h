@@ -1,32 +1,77 @@
 #ifndef SERPENT_PROTOCOL_H
 #define SERPENT_PROTOCOL_H
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <protocol.h>
+#include "types.h"
+
 typedef enum {
     MSG_INPUT, // client sends input to server
-    //MSG_JOIN, // client requests to join the game
-    //MSG_CREATE, // client requests to create a new game (sort of special join)
-    //MSG_CONFIG, // client sends game configuration to server
     MSG_PAUSE, // client notifies server of pause
     MSG_RESUME, // client notifies server of resume
     MSG_LEAVE, // client notifies server of leaving
     MSG_READY, // server notifies client that game is ready
-    MSG_GAME_OVER, // server notifies client of game over
-    MSG_SHUT_DOWN, // server notifies client of shutdown
-    MSG_STATE, // server sends game state to client
-    MSG_ERROR, // server notifies client of error
-    //MSG_ACK, // acknowledgment message
+    MSG_GAME_OVER, // server notifies client of game over (or some sort of correct ending)
+    MSG_STATE, // server sends snapshot of game state to client for rendering
+    MSG_ERROR, // server notifies client of error (incorrect ending)
 } MessageType;
 
-typedef struct MessageHeader {
+// in-memory version (semantic)
+typedef struct {
     MessageType type;
-    int client_id;
-    int payload_size;
-} MessageHeader;
-
-typedef struct Message {
-    MessageHeader header;
-    void *payload;
+    uint32_t payload_size;
+    void *payload; // owned by Message
 } Message;
 
+// wire stable helper for generic message
+typedef struct {
+    uint32_t type;
+    uint32_t payload_size;
+} MsgHeader;
+
+// wire-only header inside payload for state message
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+
+    uint32_t score;
+    uint32_t player_time_elapsed; // for particular player in seconds (time since joining game)
+    uint32_t game_time_remaining; // in seconds, -1 means no limit
+
+    uint32_t snake_count;
+    uint32_t fruit_count;
+    uint32_t obstacle_count;
+} GameStateWireHeader;
+
+
+
+static int send_all(int fd, const void *buf, size_t size);
+static int recv_all(int fd, void *buf, size_t size);
+
+// message -> byte send ->
+int send_message(int fd, const Message *msg);
+// -> byte recv -> message
+int recv_message(int fd, Message *msg);
+
+void message_destroy(Message *msg);
+
+// specializations for convenience
+// type -> payload mapping -> message -> byte send ->
+int send_input(int fd, Direction dir);
+int send_pause(int fd);
+int send_resume(int fd);
+int send_leave(int fd);
+int send_ready(int fd);
+int send_game_over(int fd);
+int send_state(int fd, const ClientGameStateSnapshot *st);
+int send_error(int fd, const char *error_msg);
+
+// (byte recv -> message ... done elsewhere i.e. not called recv_input ...)
+// message -> payload mapping -> type
+int msg_to_input(const Message *msg, Direction *dir);
+int msg_to_state(const Message *msg, ClientGameStateSnapshot *st);
+int msg_to_error(const Message *msg, char *error_msg);
 
 #endif //SERPENT_PROTOCOL_H

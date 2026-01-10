@@ -13,9 +13,9 @@ void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running) {
     tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 
     while (*running) {
-        int ch = getchar();
+        const int ch = getchar();
         if (ch == EOF) break;
-        enqueue_key(queue, (Key)ch);
+        enqueue_key(queue, (Key)ch); // enqueue the key by value
     }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
@@ -25,7 +25,7 @@ void client_input_queue_init(ClientInputQueue *q) {
     q->count = 0;
     // events[] is left with indeterminate contents; that's fine as long as
     // you only read the first `count` entries.
-    int rc = pthread_mutex_init(&q->lock, NULL);
+    const int rc = pthread_mutex_init(&q->lock, NULL);
     if (rc != 0) {
         // handle error
     }
@@ -52,7 +52,7 @@ void server_input_queue_destroy(ServerInputQueue *q) {
     pthread_cond_destroy(&q->not_full);
 }
 
-void enqueue_key(ClientInputQueue *q, Key key) {
+void enqueue_key(ClientInputQueue *q, const Key key) {
     if (!((key >= 32 && key <= 126) || key == '\n' || key == '\r' || key == '\t' || key == 27)) {
         return; /* ignore unsupported keys */
     }

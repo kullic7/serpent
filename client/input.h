@@ -1,7 +1,7 @@
 #ifndef SERPENT_INPUT_H
 #define SERPENT_INPUT_H
 
-#include "game.h"
+#include "types.h"
 #include <pthread.h>
 #include "protocol.h"
 
@@ -19,10 +19,10 @@ typedef struct ServerInputQueue {
     pthread_cond_t not_full;
 } ServerInputQueue;
 
-typedef struct {
-    ClientInputQueue *queue;
-    const _Atomic bool *running;
-} InputThreadArgs;
+typedef enum {
+    INPUT_TEXT, // text mode
+    INPUT_KEY, // key mode
+} InputMode;
 
 void client_input_queue_init(ClientInputQueue *q);
 void client_input_queue_destroy(ClientInputQueue *q);
@@ -38,6 +38,5 @@ void enqueue_msg(ServerInputQueue *q, Message msg);
 bool dequeue_msg(ServerInputQueue *q, Message *msg);
 
 void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running);
-inline void recv_msg(ServerInputQueue *q, Message *msg) {}; // receive message from server socket
 
 #endif //SERPENT_INPUT_H

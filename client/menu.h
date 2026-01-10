@@ -2,7 +2,7 @@
 #define SERPENT_MENU_H
 
 #include <stdlib.h>
-#include "game.h"
+#include "types.h"
 
 typedef void (*ButtonAction)(void *user_data);
 
