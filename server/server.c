@@ -319,12 +319,13 @@ int msg_to_event(const Message *msg, const int client_fd, Event *ev) {
 }
 
 
-void game_run(const bool timed_mode, const bool single_player, GameState *game, EventQueue *eq, ActionQueue *aq) {
+void game_run(const bool timed_mode, const bool single_player, const bool easy_mode,
+    GameState *game, EventQueue *eq, ActionQueue *aq, ClientRegistry *reg) {
 
     // wait for at least one player to connect
     Timer timeout_timer;
     timer_reset(&timeout_timer);
-    timer_set(&timeout_timer, 5); // 5 sec timeout for connection to avoid race condition with recv thread
+    timer_set(&timeout_timer, 10); // 10 sec timeout for connection to avoid race condition with recv thread
     timer_start(&timeout_timer);
     while (true) {
         // handle events (only EVENT_CONNECTED is relevant)
@@ -336,6 +337,8 @@ void game_run(const bool timed_mode, const bool single_player, GameState *game, 
         if (game->player_count > 0) break; // at least one player connected
         if (timer_expired(&timeout_timer)) {
             log_server("timeout waiting for first player connection\n");
+
+            broadcast_error(reg, "Timeout waiting for first player connection\n");
             return; // timeout waiting for first player
         }
     }
@@ -347,7 +350,7 @@ void game_run(const bool timed_mode, const bool single_player, GameState *game, 
 
         sleep_frame(GAME_TICK_TIME_MS);
 
-        game_update(game);
+        game_update(game, easy_mode, aq);
 
         // handle events
         Event ev = {0};
@@ -362,6 +365,9 @@ void game_run(const bool timed_mode, const bool single_player, GameState *game, 
         if (end_game) break;
 
     }
+
+    broadcast_game_over(reg); // must be done here before shutdown so we are sure all clients get it (its blocking)
+    log_server("game over broadcasted to clients\n");
 }
 
 // thread functions

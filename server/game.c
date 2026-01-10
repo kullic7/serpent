@@ -3,6 +3,7 @@
 #include "game.h"
 #include "server.h"
 #include "logging.h"
+#include "physics.h"
 
 void game_init(GameState *game, const int width, const int height, const int game_time,
                const bool obstacles_enabled, const bool random_world, const char *file_path) {
@@ -14,7 +15,7 @@ void game_init(GameState *game, const int width, const int height, const int gam
     game->players = NULL;
     game->player_count = 0;
 
-    game->fruits = malloc(MAX_FRUITS * sizeof(Fruit));
+    game->fruits = NULL;
     game->fruit_count = 0;
 
     game->obstacles = NULL;
@@ -31,10 +32,10 @@ void game_init(GameState *game, const int width, const int height, const int gam
     if (obstacles_enabled) {
 
         if (random_world) {
-            game_spawn_obstacles(game, file_path);
+            game_spawn_obstacles_random(game);
         }
-        else { // TODO we skip loading from file for now
-            game_spawn_obstacles(game, file_path);
+        else {
+            game_spawn_obstacles_from_file(game, file_path);
         }
     }
 }
@@ -139,10 +140,31 @@ int broadcast_game_over(ClientRegistry *reg) {
     return rc;
 }
 
+int broadcast_error(ClientRegistry *reg, const char *error_msg) {
+
+    int rc = 0;
+    pthread_mutex_lock(&reg->lock);
+    for (size_t i = 0; i < reg->count; ++i) {
+        if (send_error(reg->clients[i]->socket_fd, error_msg) < 0) {
+            log_server("FAILED: to send error message to client\n");
+            rc = -1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&reg->lock);
+
+    return rc;
+}
+
 void game_add_player(GameState *game, const int player_id) {
 
-    game->players = realloc(game->players, (game->player_count + 1) * sizeof(Player));
-    // TODO handle realloc failure
+    Player *new_players = realloc(game->players, (game->player_count + 1) * sizeof(Player));
+    if (new_players == NULL) {
+        // allocation failed, keep old `game->players` intact
+        // optionally log or handle error here
+        return;
+    }
+    game->players = new_players;
 
     Player *p = &game->players[game->player_count];
 
@@ -162,18 +184,59 @@ void game_add_player(GameState *game, const int player_id) {
     p->snake.direction = DIR_RIGHT;
     p->snake.next_direction = DIR_RIGHT;
 
-    // initialize snake position
-    for (size_t i = 0; i < INITIAL_SNAKE_LENGTH; ++i) {
-        p->snake.body[i].x = 5 - i;
-        p->snake.body[i].y = 5;
+    // initialize snake position: horizontally, centered, and away from walls/obstacles
+    bool valid_snake_pos = false;
+    while (!valid_snake_pos) {
+        // choose head x so that the whole snake fits within \[0, width)
+        const int max_head_x = game->width - 1;
+        int min_head_x = INITIAL_SNAKE_LENGTH - 1;
+        if (max_head_x <= min_head_x) {
+            // fallback: clamp to valid range
+            min_head_x = 0;
+        }
+
+        const int head_x = rand() % (max_head_x - min_head_x + 1) + min_head_x;
+        const int head_y = rand() % game->height;
+
+        valid_snake_pos = true;
+
+        // check each segment for obstacle collision
+        for (size_t i = 0; i < INITIAL_SNAKE_LENGTH && valid_snake_pos; ++i) {
+            int seg_x = head_x - (int)i;
+            int seg_y = head_y;
+
+            // defensive bounds check
+            if (seg_x < 0 || seg_x >= game->width || seg_y < 0 || seg_y >= game->height) {
+                valid_snake_pos = false;
+                break;
+            }
+
+            for (size_t j = 0; j < game->obstacle_count; ++j) {
+                if (game->obstacles[j].pos.x == seg_x &&
+                    game->obstacles[j].pos.y == seg_y) {
+                    valid_snake_pos = false;
+                    break;
+                    }
+            }
+        }
+
+        if (valid_snake_pos) {
+            for (size_t i = 0; i < INITIAL_SNAKE_LENGTH; ++i) {
+                p->snake.body[i].x = head_x - (int)i;
+                p->snake.body[i].y = head_y;
+            }
+        }
     }
 
     game->player_count++;
+
+    log_server("Player added to game\n");
 
 }
 
 void game_remove_player(GameState *game, const int player_id) {
 
+    // find player index
     size_t idx = (size_t)-1;
     for (size_t i = 0; i < game->player_count; ++i) {
         if (game->players[i].id == player_id) {
@@ -195,7 +258,6 @@ void game_remove_player(GameState *game, const int player_id) {
             free(game->players);
             game->players = NULL;
         } else {
-            // TODO: handle realloc failure if needed
             Player *tmp = realloc(game->players, game->player_count * sizeof(Player));
             if (tmp != NULL) {
                 game->players = tmp;
@@ -249,68 +311,61 @@ void game_resume_player(const GameState *game, const int player_id) {
     }
 }
 
-void game_update(GameState *game) {
+void game_update(GameState *game, const bool easy_mode, ActionQueue *aq) {
     // Update each player's snake position
     for (size_t i = 0; i < game->player_count; ++i) {
         Player *p = &game->players[i];
         if (p->paused) continue;
 
-        // Update direction
-        p->snake.direction = p->snake.next_direction;
+        move_player(p);
 
-        // move snake head
-        Position new_head = p->snake.body[0];
-        switch (p->snake.direction) {
-            case DIR_UP:    new_head.y -= 1; break;
-            case DIR_DOWN:  new_head.y += 1; break;
-            case DIR_LEFT:  new_head.x -= 1; break;
-            case DIR_RIGHT: new_head.x += 1; break;
-        }
-
-        // shift body segments to follow the previous segment
-        for (size_t seg = p->snake.length - 1; seg > 0; --seg) {
-            p->snake.body[seg] = p->snake.body[seg - 1];
-        }
-
-        p->snake.body[0] = new_head;
-
-        // Check collisions with walls
-        if (new_head.x < 0 || new_head.x >= game->width || new_head.y < 0 || new_head.y >= game->height) {
-            // ACT send game over to p->player_id TODO
+        // check collisions
+        if (player_player_collision(p, game->players, game->player_count) ||
+            player_obstacle_collision(p, game->obstacles, game->obstacle_count)) {
+            // ACT send game over to p->player_id
+            enqueue_action(aq, (Action){ .type = ACT_SEND_GAME_OVER, .u.player_id = p->id });
             // remove player
-            // todo for now just wrap around (easy mode)
-            if (new_head.x < 0) {
-                new_head.x = game->width - 1;
-            } else if (new_head.x >= game->width) {
-                new_head.x = 0;
-            }
-            if (new_head.y < 0) {
-                new_head.y = game->height - 1;
-            } else if (new_head.y >= game->height) {
-                new_head.y = 0;
-            }
+            game_remove_player(game, p->id);
+            continue; // skip further checks for this player
         }
 
-        // check collisions with fruits
-
-        /*
-        for (size_t j = 0; j < game->fruit_count; ++j) {
-            Fruit *f = &game->fruits[j];
-            if (f->active && f->pos.x == new_head.x && f->pos.y == new_head.y) {
-                // Eat fruit
-                p->score += 10;
-                f->active = false;
-                // Grow snake
-                p->snake.body = realloc(p->snake.body, (p->snake.length + 1) * sizeof(Position));
-                p->snake.length += 1;
-                break;
-                // TODO remove fruit from game?
-                // TODO spawn new fruit?
-
+        if (player_wall_collision(p, game->width, game->height)) {
+            if (!easy_mode) {
+                // ACT send game over to p->player_id
+                enqueue_action(aq, (Action){ .type = ACT_SEND_GAME_OVER, .u.player_id = p->id });
+                // remove player
+                game_remove_player(game, p->id);
+            } else {
+                // wrap around (easy mode)
+                Position *head = &p->snake.body[0];
+                if (head->x < 0) {
+                    head->x = game->width - 1;
+                } else if (head->x >= game->width) {
+                    head->x = 0;
+                }
+                if (head->y < 0) {
+                    head->y = game->height - 1;
+                } else if (head->y >= game->height) {
+                    head->y = 0;
+                }
             }
-        }*/
+            continue; // skip further checks for this player
+        }
+
+        const int fruit_collision = player_fruit_collision(p, game->fruits, game->fruit_count);
+        if (fruit_collision >= 0) {
+            // eat and deactivate fruit
+            Fruit *f = &game->fruits[i]; f->active = false; p->score += 1;
+
+            // grow player
+            grow_player(p);
+
+            // add new fruit
+            game_add_fruit(game);
+        }
     }
 
+    // remove inactive fruits
     for (size_t i = game->fruit_count; i-- > 0; ) {
         if (!game->fruits[i].active) {
             game_remove_fruit(game, i);
@@ -319,23 +374,49 @@ void game_update(GameState *game) {
 }
 
 void game_add_fruit(GameState *game) {
-    if (game->fruits == NULL) {
-        game->fruits = malloc(MAX_FRUITS * sizeof(Fruit));
-        if (game->fruits == NULL) {
-            // allocation failed, cannot add fruit
-            return;
-        }
-        game->fruit_count = 0;
+    Fruit *new_fruits = realloc(game->fruits, (game->fruit_count + 1) * sizeof(Fruit));
+    if (new_fruits == NULL) {
+        // allocation failed, do not modify existing fruits
+        return;
     }
 
-    if (game->fruit_count >= MAX_FRUITS) return;
+    game->fruits = new_fruits;
 
     Fruit f = {0};
-    f.pos.x = rand() % game->width;
-    f.pos.y = rand() % game->height;
-    f.active = true;
+
+    // find valid position
+    bool valid_pos = false;
+    while (!valid_pos) {
+        f.pos.x = rand() % game->width;
+        f.pos.y = rand() % game->height;
+        f.active = true;
+
+        valid_pos = true;
+
+        // check collision with players
+        for (size_t i = 0; i < game->player_count; ++i) {
+            const Player *p = &game->players[i];
+
+            if (player_fruit_collision(p, &f, 1) >= 0) {
+                valid_pos = false;
+                break;
+            }
+        }
+        if (!valid_pos) continue;
+
+        // check collision with obstacles
+        for (size_t i = 0; i < game->obstacle_count; ++i) {
+            if (game->obstacles[i].pos.x == f.pos.x &&
+                game->obstacles[i].pos.y == f.pos.y) {
+                valid_pos = false;
+                break;
+                }
+        }
+    }
 
     game->fruits[game->fruit_count++] = f;
+
+    log_server("Fruit added to game\n");
 }
 
 static void game_remove_fruit(GameState *game, const size_t index) {
@@ -347,17 +428,52 @@ static void game_remove_fruit(GameState *game, const size_t index) {
     game->fruit_count--;
 }
 
-void game_spawn_obstacles(GameState *game, const char *file_path) {
+void game_spawn_obstacles_from_file(GameState *game, const char *file_path) {
     // for simplicity, let's assume obstacles are placed randomly
-    const size_t max_obstacles = 20;
+    // TODO we should impl from file interpretation
+    //  for now we just call random
+    game_spawn_obstacles_random(game);
+}
+
+
+void game_spawn_obstacles_random(GameState *game) {
+
+    // choose num of obstacles at random based on board size
+    const size_t max_possible = (size_t)(game->width * game->height / 120);
+    const size_t max_obstacles = rand() % (max_possible > 0 ? max_possible : 1) + 1;
+
     game->obstacles = malloc(max_obstacles * sizeof(Obstacle));
     game->obstacle_count = 0;
 
+    // easy algorithm: try to place obstacles randomly, not allowing any neighbours
     for (size_t i = 0; i < max_obstacles; ++i) {
-        Obstacle o;
-        o.pos.x = rand() % game->width;
-        o.pos.y = rand() % game->height;
-        game->obstacles[game->obstacle_count++] = o;
+        const int max_tries = 1000;
+        bool placed = false;
+
+        for (int t = 0; t < max_tries && !placed; ++t) {
+            Obstacle o;
+            o.pos.x = rand() % game->width;
+            o.pos.y = rand() % game->height;
+
+            // check 8 neighbors \+ self for any existing obstacle
+            bool has_neighbor = false;
+            for (size_t j = 0; j < game->obstacle_count && !has_neighbor; ++j) {
+                const int dx = abs(game->obstacles[j].pos.x - o.pos.x);
+                const int dy = abs(game->obstacles[j].pos.y - o.pos.y);
+                if (dx <= 1 && dy <= 1) {
+                    has_neighbor = true;
+                }
+            }
+
+            if (!has_neighbor) {
+                game->obstacles[game->obstacle_count++] = o;
+                placed = true;
+            }
+        }
+
+        // if we cannot place more without neighbors, stop early
+        if (!placed) {
+            break;
+        }
     }
 }
-

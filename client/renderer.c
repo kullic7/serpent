@@ -101,7 +101,7 @@ void render_game(const ClientGameStateSnapshot state) {
     term_hide_cursor();
 
     // draw borders
-    draw_box(75, 5, state.width + 1, state.height + 1);
+    draw_box(WORLD_X_OFFSET, WORLD_Y_OFFSET, state.width + 1, state.height + 1);
 
     // draw score and time
     draw_text(2, 1, "Score:");
@@ -109,11 +109,14 @@ void render_game(const ClientGameStateSnapshot state) {
     snprintf(score_str, sizeof(score_str), "%zu", state.score);
     draw_text(9, 1, score_str);
 
+    draw_text(2, 2, "Remaining time:");
     if (state.game_time_remaining >= 0) {
         draw_text(2, 2, "Remaining time:");
         char time_str[64];
         snprintf(time_str, sizeof(time_str), "%ds", state.game_time_remaining);
         draw_text(18, 2, time_str);
+    } else {
+        draw_text(2, 2, "Remaining time: Inf s");
     }
 
     // draw fruits
@@ -121,22 +124,22 @@ void render_game(const ClientGameStateSnapshot state) {
         const Fruit fruit = state.fruits[i];
         if (!fruit.active)
             continue;
-        draw_text(fruit.pos.x + 2, fruit.pos.y + 2, FRUIT_CHAR);
+        draw_text(fruit.pos.x + WORLD_X_OFFSET, fruit.pos.y + WORLD_Y_OFFSET, FRUIT_CHAR);
     }
 
     // draw obstacles
     for (size_t i = 0; i < state.obstacle_count; ++i) {
         const Obstacle obstacle = state.obstacles[i];
-        draw_text(obstacle.pos.x + 2, obstacle.pos.y + 2, OBSTACLE_CHAR);
+        draw_text(obstacle.pos.x + WORLD_X_OFFSET, obstacle.pos.y + WORLD_Y_OFFSET, OBSTACLE_CHAR);
     }
 
     // draw snakes
     for (size_t i = 0; i < state.snake_count; ++i) {
         const Position head = state.snakes[i].body[0];
-        draw_text(head.x + 2, head.y + 2, "O");
-        for (size_t j = 0; j < state.snakes[i].length; ++j) {
+        draw_text(head.x + WORLD_X_OFFSET, head.y + WORLD_Y_OFFSET, "@");
+        for (size_t j = 1; j < state.snakes[i].length; ++j) {
             const Position body = state.snakes[i].body[j];
-            draw_text(body.x + 2, body.y + 2, SNAKE_CHAR);
+            draw_text(body.x + WORLD_X_OFFSET, body.y + WORLD_Y_OFFSET, SNAKE_CHAR);
         }
     }
 

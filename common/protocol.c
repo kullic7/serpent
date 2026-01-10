@@ -220,15 +220,6 @@ int send_state(const int fd, const ClientGameStateSnapshot *st) {
     return rc;
 }
 
-
-int send_time(const int fd, int seconds) {
-    Message msg;
-    msg.type = MSG_TIME;
-    msg.payload_size = sizeof(int);
-    msg.payload = &seconds;
-    return send_message(fd, &msg);
-}
-
 int send_error(const int fd, const char *error_msg) {
     if (!error_msg) return -1;
     Message msg;
@@ -313,16 +304,6 @@ int msg_to_input(const Message *msg, Direction *dir) {
     return 0;
 }
 
-int msg_to_time(const Message *msg, int *seconds) {
-    if (!msg || !seconds) return -1;
-    if (msg->type != MSG_TIME ||
-        msg->payload_size != (int)sizeof(int) ||
-        !msg->payload) {
-        return -1;
-        }
-    memcpy(seconds, msg->payload, sizeof(int));
-    return 0;
-}
 
 int msg_to_error(const Message *msg, char *error_msg) {
     if (!msg || !error_msg) return -1;
@@ -332,7 +313,7 @@ int msg_to_error(const Message *msg, char *error_msg) {
         return -1;
         }
     // copy payload to error_msg buffer
-    strncpy(error_msg, (char *)msg->payload, msg->payload_size);
+    strncpy(error_msg, msg->payload, msg->payload_size);
     error_msg[msg->payload_size - 1] = '\0'; // ensure null termination
     return 0;
 }

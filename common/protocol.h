@@ -14,7 +14,6 @@ typedef enum {
     MSG_READY, // server notifies client that game is ready
     MSG_GAME_OVER, // server notifies client of game over (or some sort of correct ending)
     MSG_STATE, // server sends snapshot of game state to client for rendering
-    MSG_TIME, // server sends remaining time to client for rendering ... just for testing
     MSG_ERROR, // server notifies client of error (incorrect ending)
 } MessageType;
 
@@ -67,14 +66,12 @@ int send_leave(int fd);
 int send_ready(int fd);
 int send_game_over(int fd);
 int send_state(int fd, const ClientGameStateSnapshot *st);
-int send_time(int fd, int seconds);
 int send_error(int fd, const char *error_msg);
 
 // (byte recv -> message ... done elsewhere i.e. not called recv_input ...)
 // message -> payload mapping -> type
 int msg_to_input(const Message *msg, Direction *dir);
 int msg_to_state(const Message *msg, ClientGameStateSnapshot *st);
-int msg_to_time(const Message *msg, int *seconds);
 int msg_to_error(const Message *msg, char *error_msg);
 
 #endif //SERPENT_PROTOCOL_H

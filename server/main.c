@@ -15,6 +15,9 @@ int main(int argc, char **argv) {
     // this is desired on servers
     signal(SIGPIPE, SIG_IGN);
 
+    // seed random
+    srand((unsigned int)time(NULL));
+
     // game configuration comes as command line arguments
     // --------------------------------------------------------
     // todo maybe game/world size ... but how to sync with client ?
@@ -116,17 +119,13 @@ int main(int argc, char **argv) {
     // --------------------------------------------------------
 
     GameState state;
-    game_init(&state, 40, 20, game_time, obstacles_enabled, random_world, obstacles_file_path); // default size 40x20
+    game_init(&state, WORLD_WIDTH, WORLD_HEIGHT, game_time, obstacles_enabled, random_world, obstacles_file_path);
 
-    game_run(game_time >= 0, single_player, &state, &events, &actions);
-
+    game_run(game_time >= 0, single_player, !obstacles_enabled, &state, &events, &actions, &registry);
 
     // shutdown
     // --------------------------------------------------------
     log_server("game loop ended\n");
-
-    broadcast_game_over(&registry); // must be done here before shutdown so we are sure all clients get it (its blocking)
-    log_server("game over broadcasted to clients\n");
 
     accepting = false;
     running = false;

@@ -25,6 +25,7 @@ target_include_directories(serpent-client PRIVATE
 add_executable(serpent-server server/main.c
         server/server.c
         server/game.c
+        server/physics.c
         server/registry.c
         server/events.c
         common/timer.c

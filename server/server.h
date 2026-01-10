@@ -33,7 +33,8 @@ typedef struct {
 } TimerThreadArgs;
 
 // game
-void game_run(bool timed_mode, bool single_player, GameState *game, EventQueue *eq, ActionQueue *aq);
+void game_run(bool timed_mode, bool single_player, bool easy_mode,
+    GameState *game, EventQueue *eq, ActionQueue *aq, ClientRegistry *reg);
 
 // infrastructure
 

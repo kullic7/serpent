@@ -6,28 +6,22 @@
 #define SERVER_LOG_FILE "server_log.txt"
 #define CLIENT_LOG_FILE "client_log.txt"
 
-#define MAX_CLIENTS 16
 #define INITIAL_SNAKE_LENGTH 3
-#define FRUIT_COUNT 5
-#define OBSTACLE_COUNT 3
+
+#define WORLD_WIDTH 90
+#define WORLD_HEIGHT 40
+#define WORLD_X_OFFSET 20
+#define WORLD_Y_OFFSET 6
 
 #define MAX_EVENTS 1024
 #define MAX_ACTIONS 1024
 #define MAX_KEY_EVENTS 16
 #define MAX_MESSAGES 1024
 
-#define MENU_MAX_TEXT_LENGTH 64
-
-#define BUTTON_WIDTH 40
-#define BUTTON_HEIGHT 10
-
-
 #define TARGET_FPS 60 // frames per second for rendering
 #define FRAME_TIME_MS (1000 / TARGET_FPS)
-#define GAME_TICK_RATE 10 // game updates per second .. sort of speed
+#define GAME_TICK_RATE 15 // game updates per second .. sort of speed
 #define GAME_TICK_TIME_MS (1000 / GAME_TICK_RATE)
-
-#define MAX_FRUITS 30
 
 #define SNAKE_CHAR "o"
 #define FRUIT_CHAR "*"
@@ -43,6 +37,7 @@
 #define KEY_ENTER   '\n'
 #define KEY_ESC     '\x1b'
 
+#define MENU_MAX_TEXT_LENGTH 512
 #define MENU_STACK_MAX 12
 
 #endif //SERPENT_CONFIG_H

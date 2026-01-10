@@ -391,13 +391,13 @@ void init_world_select_menu(ClientContext *ctx) {
 void init_load_menu(ClientContext *ctx) {
     static Button buttons[] = {
         {
-            .text = "From File", // pre-defined obstacles
-            .on_press = btn_load_from_file,
+            .text = "Random", // random obstacles
+            .on_press = btn_random_world,
             .user_data = NULL
         },
         {
-            .text = "Random", // random obstacles
-            .on_press = btn_random_world,
+            .text = "From File", // pre-defined obstacles
+            .on_press = btn_load_from_file,
             .user_data = NULL
         },
         {
@@ -612,13 +612,6 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
             }
 
             log_client("msg state received\n");
-            break;
-        }
-        case MSG_TIME: {
-            int time;
-            msg_to_time(&msg, &time);
-            ctx->game.game_time_remaining = time;
-            log_client("msg time received\n");
             break;
         }
         case MSG_ERROR: {

@@ -59,7 +59,7 @@ void timer_reset(Timer *t) {
 }
 
 double timer_remaining(const Timer *t) {
-    if (t->duration_sec <= 0.0) return 0.0;
+    if (t->duration_sec <= 0.0) return -1.0;
     const double elapsed = timer_elapsed(t);
     const double remaining = t->duration_sec - elapsed;
     return remaining > 0.0 ? remaining : 0.0;
