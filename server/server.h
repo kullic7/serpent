@@ -11,7 +11,7 @@ typedef struct {
     ActionQueue *aq;
     ClientRegistry *reg;
     const _Atomic bool *running;
-} ActionThreadArgs;
+} WorkerThreadArgs;
 
 typedef struct {
     EventQueue *eq;
@@ -33,8 +33,6 @@ typedef struct {
 } TimerThreadArgs;
 
 // game
-void game_run(bool timed_mode, bool single_player, bool easy_mode,
-    GameState *game, EventQueue *eq, ActionQueue *aq, ClientRegistry *reg);
 
 // infrastructure
 

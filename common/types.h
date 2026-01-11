@@ -11,16 +11,6 @@ typedef struct {
 } Position;
 
 typedef struct {
-    int width;
-    int height;
-} Size;
-
-typedef struct {
-    Size size;
-    Position pos;
-} Box;
-
-typedef struct {
     const char text[MENU_MAX_TEXT_LENGTH];
 } TextField;
 
@@ -30,24 +20,6 @@ typedef enum {
     DIR_LEFT,
     DIR_RIGHT
 } Direction;
-
-typedef struct {
-    Position *body; // dynamic array of positions
-    size_t length;
-    size_t capacity;
-    Direction direction;     // UP, DOWN, LEFT, RIGHT
-    Direction next_direction;
-    //bool alive; // maybe it should be active instead
-} Snake;
-
-typedef struct {
-    int id;
-    Snake snake;
-    size_t score;
-    bool paused;
-    bool resume_ev_pending;
-    Timer timer;
-} Player;
 
 typedef struct {
     Position pos;
@@ -60,7 +32,6 @@ typedef struct {
 
 
 // snapshot types for network and client rendering
-// over wire stable (static) arrays
 typedef struct {
     Position *body;
     size_t length;

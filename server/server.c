@@ -175,8 +175,8 @@ bool handle_end_event(const bool timed_mode, const bool single_player, const Gam
         }
     }
     else {
-        if ( timer_expired(&state->timer) ) {
-            log_server("timer expired\n");
+        if ( timer_expired(&state->timer) || (single_player && state->player_count == 0) ) {
+            log_server("timer expired or player disconnected\n");
             return true; // time limit reached
         }
     }
@@ -230,9 +230,9 @@ void exec_action(const Action *act, EventQueue *q, ClientRegistry *reg) {
             send_game_over(act->u.player_id);
             log_server("act send game over executed\n");
             break;
-        case ACT_BROADCAST_GAME_STATE:
-            // send game state act->u.state to all clients
-            broadcast_game_state(reg, act->u.game); // TODO handle errors if needed
+        case ACT_SEND_GAME_STATE:
+            // send game state act->u.game.state to client act->u.player_id
+            send_state(act->u.player_id, act->u.game.state);
             snapshot_destroy(act->u.game.state); // free dynamic arrays inside
             free(act->u.game.state); // free the struct itself
             log_server("act send broadcast game state executed\n");
@@ -319,57 +319,6 @@ int msg_to_event(const Message *msg, const int client_fd, Event *ev) {
 }
 
 
-void game_run(const bool timed_mode, const bool single_player, const bool easy_mode,
-    GameState *game, EventQueue *eq, ActionQueue *aq, ClientRegistry *reg) {
-
-    // wait for at least one player to connect
-    Timer timeout_timer;
-    timer_reset(&timeout_timer);
-    timer_set(&timeout_timer, 10); // 10 sec timeout for connection to avoid race condition with recv thread
-    timer_start(&timeout_timer);
-    while (true) {
-        // handle events (only EVENT_CONNECTED is relevant)
-        Event ev = {0};
-        while (dequeue_event(eq, &ev)) {
-            handle_event(&ev, aq, game);
-        }
-
-        if (game->player_count > 0) break; // at least one player connected
-        if (timer_expired(&timeout_timer)) {
-            log_server("timeout waiting for first player connection\n");
-
-            broadcast_error(reg, "Timeout waiting for first player connection\n");
-            return; // timeout waiting for first player
-        }
-    }
-
-    timer_start(&game->timer);
-    while (true) {
-
-        game_snapshot_each_client(game, aq);
-
-        sleep_frame(GAME_TICK_TIME_MS);
-
-        game_update(game, easy_mode, aq);
-
-        // handle events
-        Event ev = {0};
-        bool end_game = false;
-        while (dequeue_event(eq, &ev)) {
-            end_game = handle_event(&ev, aq, game);
-        }
-        if (end_game) break;
-
-        end_game = handle_end_event(timed_mode, single_player, game, aq);
-
-        if (end_game) break;
-
-    }
-
-    broadcast_game_over(reg); // must be done here before shutdown so we are sure all clients get it (its blocking)
-    log_server("game over broadcasted to clients\n");
-}
-
 // thread functions
 
 /*
@@ -433,7 +382,7 @@ void *accept_loop_thread(void *arg) {
 }
 
 void *action_thread(void *arg) {
-    const ActionThreadArgs *args = arg;
+    const WorkerThreadArgs *args = arg;
 
     EventQueue *eq = args->eq;
     ActionQueue *aq = args->aq;

@@ -3,7 +3,6 @@
 #include "game.h"
 #include "server.h"
 #include "logging.h"
-#include "physics.h"
 
 void game_init(GameState *game, const int width, const int height, const int game_time,
                const bool obstacles_enabled, const bool random_world, const char *file_path) {
@@ -51,12 +50,64 @@ void game_destroy(const GameState *game) {
     free(game->obstacles); // free is noop on NULL so its ok
 }
 
-void game_snapshot_each_client(const GameState *game, ActionQueue *aq) {
+void game_run(GameState *game, const bool timed_mode, const bool single_player, const bool easy_mode,
+    EventQueue *eq, ActionQueue *aq, ClientRegistry *reg) {
+
+    // timeout loop - waiting for at least one player to connect
+    Timer timeout_timer;
+    timer_reset(&timeout_timer);
+    timer_set(&timeout_timer, 10); // 10 sec timeout for connection to avoid race condition with recv thread
+    timer_start(&timeout_timer);
+    while (true) {
+        // handle events (only EVENT_CONNECTED is relevant)
+        Event ev = {0};
+        while (dequeue_event(eq, &ev)) {
+            handle_event(&ev, aq, game);
+        }
+
+        if (game->player_count > 0) break; // at least one player connected
+        if (timer_expired(&timeout_timer)) {
+            log_server("timeout waiting for first player connection\n");
+
+            broadcast_error(reg, "Timeout waiting for first player connection\n");
+            return; // timeout waiting for first player
+        }
+    }
+
+    // game loop
+    timer_start(&game->timer);
+    while (true) {
+
+        game_broadcast_snapshot(game, aq);
+
+        sleep_frame(GAME_TICK_TIME_MS);
+
+        game_update(game, easy_mode, aq);
+
+        // handle events
+        Event ev = {0};
+        bool end_game = false;
+        while (dequeue_event(eq, &ev)) {
+            end_game = handle_event(&ev, aq, game);
+        }
+        if (end_game) break;
+
+        end_game = handle_end_event(timed_mode, single_player, game, aq);
+
+        if (end_game) break;
+
+    }
+
+    broadcast_game_over(reg); // must be done here before shutdown so we are sure all clients get it (its blocking)
+    log_server("game over broadcasted to clients\n");
+}
+
+void game_broadcast_snapshot(const GameState *game, ActionQueue *aq) {
 
     // for each client
     for (size_t i = 0; i < game->player_count; ++i) {
         Action act;
-        act.type = ACT_BROADCAST_GAME_STATE;
+        act.type = ACT_SEND_GAME_STATE;
 
         ClientGameStateSnapshot *snapshot = malloc(sizeof(*snapshot));
         if (!snapshot) {
@@ -102,26 +153,11 @@ void game_snapshot_each_client(const GameState *game, ActionQueue *aq) {
         }
 
         act.u.game.state = snapshot;      // pointer, no copy
+        act.u.game.player_id = game->players[i].id;
 
         enqueue_action(aq, act);
 
     }
-}
-
-int broadcast_game_state(ClientRegistry *reg, const ActArgGameState game) {
-
-    int rc = 0;
-    pthread_mutex_lock(&reg->lock);
-    for (size_t i = 0; i < reg->count; ++i) {
-        if (send_state(reg->clients[i]->socket_fd, game.state) < 0) {
-            log_server("FAILED: to send game state to client\n");
-            rc = -1;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&reg->lock);
-
-    return rc;
 }
 
 int broadcast_game_over(ClientRegistry *reg) {
@@ -312,7 +348,7 @@ void game_resume_player(const GameState *game, const int player_id) {
 }
 
 void game_update(GameState *game, const bool easy_mode, ActionQueue *aq) {
-    // Update each player's snake position
+    // update each player's snake position
     for (size_t i = 0; i < game->player_count; ++i) {
         Player *p = &game->players[i];
         if (p->paused) continue;
@@ -352,10 +388,10 @@ void game_update(GameState *game, const bool easy_mode, ActionQueue *aq) {
             continue; // skip further checks for this player
         }
 
-        const int fruit_collision = player_fruit_collision(p, game->fruits, game->fruit_count);
-        if (fruit_collision >= 0) {
+        const int collided_fruit_idx = player_fruit_collision(p, game->fruits, game->fruit_count);
+        if (collided_fruit_idx >= 0) {
             // eat and deactivate fruit
-            Fruit *f = &game->fruits[i]; f->active = false; p->score += 1;
+            Fruit *f = &game->fruits[collided_fruit_idx]; f->active = false; p->score += 1;
 
             // grow player
             grow_player(p);
@@ -387,8 +423,8 @@ void game_add_fruit(GameState *game) {
     // find valid position
     bool valid_pos = false;
     while (!valid_pos) {
-        f.pos.x = rand() % game->width;
-        f.pos.y = rand() % game->height;
+        f.pos.x = 1 + rand() % (game->width  - 2);
+        f.pos.y = 1 + rand() % (game->height - 2);
         f.active = true;
 
         valid_pos = true;

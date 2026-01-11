@@ -58,7 +58,7 @@ typedef enum {
     ACT_LOAD_WORLD, // main -> worker: response event EV_LOADED
     ACT_SEND_READY, // (worker sends EV_CONNECTED) main -> worker: send msg ready, player id param
     ACT_SEND_GAME_OVER, // send msg game over, player id param only (game state is expected to send updates)
-    ACT_BROADCAST_GAME_STATE, // ActArgGameState param
+    ACT_SEND_GAME_STATE, // ActArgGameState param
     ACT_UNREGISTER_PLAYER, // player id param
     ACT_WAIT_FOR_END, // end in seconds param
     ACT_WAIT_PAUSED, // ActArgPlayerWait
@@ -71,6 +71,7 @@ typedef struct {
 } ActArgPlayerWait;
 
 typedef struct {
+    int player_id;
     ClientGameStateSnapshot *state; // dynamically allocated snapshot, ownership transfer main thread -> worker (so worker frees it)
 } ActArgGameState;
 

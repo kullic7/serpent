@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
     // worker thread
     // --------------------------------------------------------
     pthread_t worker_thread;
-    ActionThreadArgs worker_args = {&events, &actions, &registry, &running};
+    WorkerThreadArgs worker_args = {&events, &actions, &registry, &running};
     const int rc = pthread_create(&worker_thread, NULL, action_thread, &worker_args);
     if (rc != 0) {
         // handle error
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
     GameState state;
     game_init(&state, WORLD_WIDTH, WORLD_HEIGHT, game_time, obstacles_enabled, random_world, obstacles_file_path);
 
-    game_run(game_time >= 0, single_player, !obstacles_enabled, &state, &events, &actions, &registry);
+    game_run(&state, game_time >= 0, single_player, !obstacles_enabled, &events, &actions, &registry);
 
     // shutdown
     // --------------------------------------------------------

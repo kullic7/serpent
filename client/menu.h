@@ -15,7 +15,6 @@ typedef struct {
 } Button;
 
 typedef struct {
-    Size size; // TODO not used currently
 
     size_t button_count;
     Button *buttons;

@@ -4,7 +4,6 @@
 #include <pthread.h>
 
 typedef struct Client {
-    //int id;
     int socket_fd;  // acts as unique identifier for client
     int time_joined;
     pthread_t thread;
