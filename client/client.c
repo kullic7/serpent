@@ -739,15 +739,15 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
             break;
         }
         case MSG_ERROR: {
-            char error_msg;
-            msg_to_error(&msg, &error_msg);
+            char error_msg[256];
+            msg_to_error(&msg, error_msg, sizeof(error_msg));
 
-            log_client("msg error received: %c\n");
+            log_client("msg error received");
 
             ctx->mode = CLIENT_MENU;
 
             snprintf(ctx->error_menu.txt_fields[0].text, sizeof(ctx->error_menu.txt_fields[0].text),
-                 "Error from server: %c", error_msg);
+                 "Error from server: %s", error_msg);
             clear_menus_stack(&ctx->menus);
             menu_push(&ctx->menus, &ctx->error_menu);
             break;

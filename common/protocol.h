@@ -72,6 +72,6 @@ int send_error(int fd, const char *error_msg);
 // message -> payload mapping -> type
 int msg_to_input(const Message *msg, Direction *dir);
 int msg_to_state(const Message *msg, ClientGameStateSnapshot *st);
-int msg_to_error(const Message *msg, char *error_msg);
+int msg_to_error(const Message *msg, char *error_msg, size_t buf_size);
 
 #endif //SERPENT_PROTOCOL_H

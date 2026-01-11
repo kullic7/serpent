@@ -374,16 +374,20 @@ int msg_to_input(const Message *msg, Direction *dir) {
 }
 
 
-int msg_to_error(const Message *msg, char *error_msg) {
+int msg_to_error(const Message *msg, char *error_msg, const size_t buf_size) {
     if (!msg || !error_msg) return -1;
     if (msg->type != MSG_ERROR ||
         msg->payload_size <= 0 ||
         !msg->payload) {
         return -1;
         }
+
+    size_t n = msg->payload_size;
+    if (n > buf_size) n = buf_size - 1;
+
     // copy payload to error_msg buffer
-    strncpy(error_msg, msg->payload, msg->payload_size);
-    error_msg[msg->payload_size - 1] = '\0'; // ensure null termination
+    memcpy(error_msg, msg->payload, n);
+    error_msg[n] = '\0'; // ensure null termination
     return 0;
 }
 
