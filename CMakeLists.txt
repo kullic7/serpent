@@ -38,3 +38,15 @@ target_include_directories(serpent-server PRIVATE
         ${CMAKE_SOURCE_DIR}/server
         ${CMAKE_SOURCE_DIR}/common
 )
+
+add_custom_target(memcheck
+        COMMAND valgrind
+        --leak-check=full
+        --track-origins=yes
+        --trace-children=yes
+        --log-file=valgrind.log
+        $<TARGET_FILE:serpent-client>
+        DEPENDS serpent-client serpent-server
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running Valgrind on serpent-client (with child processes)"
+)
