@@ -12,7 +12,15 @@
 #include <errno.h>
 
 
-
+/**
+ * Creates and initializes a Unix domain server socket.
+ *
+ * The socket is bound to the given filesystem path and put into listening
+ * mode, ready to accept incoming client connections.
+ *
+ * @param path  Filesystem path for the Unix domain socket.
+ * @return File descriptor of the listening socket, or -1 on error.
+ */
 int setup_server_socket(const char *path) {
     const int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_fd < 0) {
@@ -41,6 +49,19 @@ int setup_server_socket(const char *path) {
 
     return listen_fd;
 }
+
+/**
+ * Accepts a new client connection and initializes its input handling thread.
+ *
+ * The function accepts a connection on the listening socket, starts a
+ * dedicated thread for receiving client input, and registers the client
+ * in the server's client registry.
+ *
+ * @param r         Pointer to the client registry.
+ * @param listen_fd Listening socket file descriptor.
+ * @param args      Arguments passed to the client input receiving thread.
+ * @return 0 on success, -1 on error.
+ */
 
 int accept_connection(ClientRegistry *r, const int listen_fd, RecvInputThreadArgs *args) {
     char buf[64];
@@ -72,6 +93,19 @@ int accept_connection(ClientRegistry *r, const int listen_fd, RecvInputThreadArg
     return 0;
 }
 
+/**
+ * Continuously accepts incoming client connections.
+ *
+ * The function runs an accept loop while the accepting flag is set.
+ * Each accepted connection is handed over to accept_connection(),
+ * which initializes client handling and registers the client.
+ *
+ * @param r          Pointer to the client registry.
+ * @param listen_fd  Listening socket file descriptor.
+ * @param accepting  Atomic flag controlling whether the server
+ *                   should continue accepting new connections.
+ * @param recv_args  Arguments passed to the client input receiving threads.
+ */
 void accept_loop(ClientRegistry *r, const int listen_fd, const _Atomic bool *accepting, RecvInputThreadArgs *recv_args) {
     // TODO signal for graceful shutdown
     log_server("entering accept loop \n");
@@ -338,6 +372,16 @@ void *accept_loop_thread(void *arg) {
 }
 */
 
+/**
+ * Thread entry point for accepting incoming client connections.
+ *
+ * The function waits for incoming connections on the listening socket
+ * using poll() with a timeout, allowing periodic checks of the atomic
+ * accepting flag for graceful shutdown.
+ *
+ * @param arg  Pointer to AcceptLoopThreadArgs structure.
+ * @return NULL when the accept loop terminates.
+ */
 void *accept_loop_thread(void *arg) {
     const AcceptLoopThreadArgs *args = arg;
 
@@ -381,6 +425,16 @@ void *accept_loop_thread(void *arg) {
     return NULL;
 }
 
+/**
+ * Worker thread responsible for processing queued actions.
+ *
+ * The thread continuously dequeues actions from the action queue and
+ * executes them, producing events that are pushed into the event queue.
+ * Execution continues while the running flag is set.
+ *
+ * @param arg  Pointer to WorkerThreadArgs structure.
+ * @return NULL when the thread terminates.
+ */
 void *action_thread(void *arg) {
     const WorkerThreadArgs *args = arg;
 
@@ -433,6 +487,18 @@ void *recv_input_thread(void *arg) {
 }
 */
 
+//1 client = 1 recv_input_thread
+/**
+ * Thread entry point for receiving input messages from a connected client.
+ *
+ * The thread monitors the client socket using poll(), receives protocol
+ * messages, converts them into internal events, and enqueues them into
+ * the event queue. The thread runs while the running flag is set and
+ * terminates on client disconnect or socket error.
+ *
+ * @param arg  Pointer to RecvInputThreadArgs structure.
+ * @return NULL when the thread terminates.
+ */
 void *recv_input_thread(void *arg) {
     const RecvInputThreadArgs *args = arg;
 
