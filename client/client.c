@@ -77,6 +77,11 @@ void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) 
             render_game(ctx->game);
         }
     }
+    // drain any remaining server messages so we do not leak memory
+    Message msg; // message payload on heap needs freeing
+    while (dequeue_msg(sq, &msg)) {
+        message_destroy(&msg);  // if payload_size > 0
+    }
 
 }
 

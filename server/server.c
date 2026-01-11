@@ -453,6 +453,11 @@ void *action_thread(void *arg) {
     }
     log_server("THREAD: ACTION completed\n");
 
+
+    //drain any remaining actions so we don't leak
+    while (dequeue_action(aq, &act)) {
+        exec_action(&act, eq, reg);
+    }
     return NULL;
 }
 
