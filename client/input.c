@@ -4,7 +4,17 @@
 #include <termios.h>
 #include <unistd.h>
 
-
+/**
+ * Reads keyboard input from the terminal and enqueues pressed keys.
+ *
+ * Switches the terminal to non-canonical, no-echo mode to receive
+ * key presses immediately without waiting for ENTER.
+ * Runs in a loop until the running flag becomes false.
+ * Restores the original terminal settings before returning.
+ *
+ * @param queue Thread-safe queue used to store input keys.
+ * @param running Atomic flag controlling the lifetime of the input loop.
+ */
 void read_keyboard_input(ClientInputQueue *queue, const _Atomic bool *running) {
     struct termios old_tio, new_tio;
     tcgetattr(STDIN_FILENO, &old_tio);
@@ -52,6 +62,17 @@ void server_input_queue_destroy(ServerInputQueue *q) {
     pthread_cond_destroy(&q->not_full);
 }
 
+/**
+ * Enqueues a supported key into the client input queue.
+ *
+ * Accepts printable ASCII characters and selected control keys
+ * (ENTER, TAB, ESC). Unsupported keys are ignored.
+ * The queue is protected by a mutex and keys are dropped if the
+ * queue is full.
+ *
+ * @param q   Pointer to the client input queue.
+ * @param key Key value to enqueue.
+ */
 void enqueue_key(ClientInputQueue *q, const Key key) {
     if (!((key >= 32 && key <= 126) || key == '\n' || key == '\r' || key == '\t' || key == 27)) {
         return; /* ignore unsupported keys */
@@ -64,6 +85,17 @@ void enqueue_key(ClientInputQueue *q, const Key key) {
     pthread_mutex_unlock(&q->lock);
 }
 
+/**
+ * Dequeues the oldest key from the client input queue.
+ *
+ * Retrieves and removes the first key in FIFO order.
+ * The operation is non-blocking and returns false if the queue is empty.
+ * Access to the queue is protected by a mutex.
+ *
+ * @param q   Pointer to the client input queue.
+ * @param key Output parameter receiving the dequeued key.
+ * @return true if a key was dequeued, false if the queue was empty.
+ */
 bool dequeue_key(ClientInputQueue *q, Key *key) {
     pthread_mutex_lock(&q->lock);
     if (q->count == 0) {
@@ -87,7 +119,20 @@ void client_input_queue_flush(ClientInputQueue *q) {
     pthread_mutex_unlock(&q->lock);
 }
 
-
+/**
+ * Enqueues a message into the server input queue.
+ *
+ * This function is thread-safe. If the queue has reached its
+ * maximum capacity, the calling thread blocks until space
+ * becomes available.
+ *
+ * The function acquires the queue mutex before modifying the
+ * internal buffer and uses a condition variable to wait when
+ * the queue is full.
+ *
+ * @param q   Pointer to the server input queue
+ * @param msg Message to be enqueued
+ */
 void enqueue_msg(ServerInputQueue *q, Message msg) {
     pthread_mutex_lock(&q->lock);
 
@@ -100,6 +145,21 @@ void enqueue_msg(ServerInputQueue *q, Message msg) {
     pthread_mutex_unlock(&q->lock);
 }
 
+/**
+ * Dequeues a message from the server input queue.
+ *
+ * This function is thread-safe and non-blocking. If the queue
+ * is empty, it immediately returns false.
+ *
+ * On success, the oldest message (FIFO order) is copied into
+ * the provided output parameter and removed from the queue.
+ * If the queue was previously full, one waiting producer
+ * thread is notified via the not_full condition variable.
+ *
+ * @param q   Pointer to the server input queue
+ * @param msg Output parameter for the dequeued message
+ * @return true if a message was dequeued, false if the queue was empty
+ */
 bool dequeue_msg(ServerInputQueue *q, Message *msg) {
     pthread_mutex_lock(&q->lock);
     if (q->count == 0) {

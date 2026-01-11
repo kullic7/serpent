@@ -15,6 +15,27 @@
 #include "logging.h"
 #include "context.h"
 
+/**
+ * Runs the main client event loop.
+ *
+ * This function represents the central execution loop of the client.
+ * It processes user input events and server messages asynchronously
+ * using thread-safe queues and renders the current client state.
+ *
+ * The loop performs the following steps repeatedly:
+ *  - checks server process state
+ *  - processes all pending keyboard input events
+ *  - processes all pending server messages
+ *  - renders either the active game or the current menu
+ *
+ * Input and network operations are handled in separate threads.
+ * This function never blocks and runs until the client running
+ * flag becomes false.
+ *
+ * @param ctx Client context holding application state
+ * @param iq  Queue containing keyboard input events
+ * @param sq  Queue containing messages received from the server
+ */
 void client_run(ClientContext *ctx, ClientInputQueue *iq, ServerInputQueue *sq) {
     while (ctx->running) {
 
@@ -99,7 +120,15 @@ void client_init(ClientContext *ctx) {
     menu_push(&ctx->menus, &ctx->main_menu);
 }
 
-
+/**
+ * Performs client shutdown and resource cleanup.
+ *
+ * Closes the active server connection if present, restores the terminal
+ * state (cursor visibility, screen contents, cursor position), and
+ * releases client-side resources before exiting the application.
+ *
+ * @param ctx Pointer to the client context.
+ */
 void client_cleanup(ClientContext *ctx) {
 
     disconnect_from_server(ctx);
@@ -115,6 +144,18 @@ void client_cleanup(ClientContext *ctx) {
 
 // used by very first client to spawn server and connect to it
 // single or multi player
+/**
+ * Spawns a new server process and connects the client to it.
+ *
+ * Verifies that the server socket path is not already in use, starts
+ * the server process, waits for the server to create its socket, and
+ * then connects the client. If any step fails, an appropriate error
+ * message is written to the error menu and the function returns false.
+ *
+ * @param ctx Pointer to the client context.
+ * @return true if the server was successfully started and the client
+ *         was connected, false if any step failed.
+ */
 bool spawn_connect_create_server(ClientContext *ctx) {
 
     // check if socket file not already taken
@@ -147,6 +188,18 @@ bool spawn_connect_create_server(ClientContext *ctx) {
 
 }
 
+/**
+ * Spawns a server process by forking the current client process and
+ * executing the server executable in the child process.
+ *
+ * The server is started with configuration arguments derived from the
+ * client context (socket path, game mode, time limit, and world settings).
+ * On success, the server process ID is stored in the client context.
+ *
+ * @param ctx Pointer to the client context.
+ * @return true if the server process was successfully created,
+ *         false if fork or exec failed.
+ */
 bool spawn_server_process(ClientContext *ctx) {
     int pid = fork();
     if (pid == 0) {
@@ -181,6 +234,15 @@ bool spawn_server_process(ClientContext *ctx) {
     return true; // parent process
 }
 
+/**
+ * Non-blocking check whether the server process has exited.
+ *
+ * Polls the server child process using waitpid() with WNOHANG.
+ * If the server has terminated, the process is reaped to avoid
+ * zombie processes and the stored server PID is invalidated.
+ *
+ * @param ctx Pointer to the client context containing the server PID.
+ */
 void poll_server_exit(ClientContext *ctx) {
     if (ctx->server_pid <= 0)
         return;
@@ -200,7 +262,12 @@ void setup_input(ClientContext *ctx, const char *note) {
     ctx->text_len = 0;
     strncpy(ctx->text_note, note, sizeof(ctx->text_note));
 }
-
+/**
+ * Establishes a connection to the server and stores the socket descriptor.
+* * @param ctx Pointer to the client context containing the server path.
+ * @return true if the connection was successfully established,
+ *         false if socket creation or connection failed.
+ */
 bool connect_to_server(ClientContext *ctx) {
     const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return false;
@@ -221,6 +288,16 @@ bool connect_to_server(ClientContext *ctx) {
 // server must create socket before this returns true
 // we will wait for that ... simplified readiness check for unix socket
 // blocking call
+/**
+ * Waits until a server socket file appears or a timeout expires.
+ *
+ * Periodically checks for the existence of the socket at the given path
+ * and returns true if it is found within the specified time limit.
+ *
+ * @param path        Path to the server socket file.
+ * @param timeout_ms  Maximum time to wait in milliseconds.
+ * @return true if the socket appears before timeout, false otherwise.
+ */
 bool wait_for_server_socket(const char *path, int timeout_ms) {
     const int step_ms = 50;
     int waited = 0;
@@ -243,7 +320,14 @@ bool wait_for_server_socket(const char *path, int timeout_ms) {
     return false;
 }
 
-
+/**
+ * Disconnects the client from the server.
+ *
+ * Closes the active socket connection if one exists and resets the
+ * socket file descriptor in the client context.
+ *
+ * @param ctx Pointer to the client context.
+ */
 void disconnect_from_server(ClientContext *ctx) {
     if (ctx->socket_fd >= 0) {
         close(ctx->socket_fd);
@@ -508,6 +592,16 @@ static void init_menu_fields(Menu *menu, Button *buttons, const size_t b_count,
     menu->selected_index = 0;
 }
 
+/**
+ * Handles keyboard input for a menu.
+ *
+ * Processes navigation keys (up/down) to change the currently selected
+ * menu item and action keys (enter, escape, quit) to trigger the
+ * corresponding menu actions or global commands.
+ *
+ * @param menu Pointer to the active menu.
+ * @param key  Key pressed by the user.
+ */
 void handle_menu_key(Menu *menu, const Key key) {
     //printf("Key pressed: %d (%c)\n", (int)key, (char)key);
     switch (key) {
@@ -539,6 +633,17 @@ void handle_menu_key(Menu *menu, const Key key) {
     }
 }
 
+/**
+ * Handles keyboard input during gameplay.
+ *
+ * Pause-related keys switch the client to paused mode,
+ * notify the server, and display the pause menu.
+ * Movement keys are translated into directions and sent to the server.
+ * All other keys are ignored.
+ *
+ * @param key Pressed key.
+ * @param ctx Client context.
+ */
 void handle_game_key(ClientContext *ctx, const Key key) {
     if (key == KEY_QUIT || key == KEY_PAUSE || key == KEY_ESC) {
         ctx->mode = CLIENT_PAUSED;
@@ -578,6 +683,20 @@ void handle_game_key(ClientContext *ctx, const Key key) {
     } else log_client("send\n");
 }
 
+/**
+ * Handles a single message received from the server.
+ *
+ * This function interprets the message type and updates the
+ * client state accordingly. It is the only place where server
+ * messages are decoded and applied to the client context.
+ *
+ * Any dynamically allocated payload contained in the message
+ * is expected to be processed and ownership transferred or
+ * released during handling.
+ *
+ * @param ctx Client context to be updated
+ * @param msg Message received from the server
+ */
 void handle_server_msg(ClientContext *ctx, const Message msg) {
     // only message handler
     /*
@@ -634,6 +753,17 @@ void handle_server_msg(ClientContext *ctx, const Message msg) {
     }
 }
 
+/**
+ * Handles text input while the client is in text input mode.
+ *
+ * Printable characters are appended to the input buffer.
+ * ENTER submits the text via a callback and returns to game mode.
+ * ESC cancels text input and clears the buffer.
+ * A temporary backspace behavior removes the last character.
+ *
+ * @param ctx Client context containing text buffer and input state.
+ * @param key Pressed key.
+ */
 void handle_text_input(ClientContext *ctx, const Key key) {
 
     // handle escape
@@ -674,7 +804,16 @@ void handle_text_input(ClientContext *ctx, const Key key) {
 }
 
 // thread functions
-
+/**
+ * Thread function responsible for reading keyboard input.
+ *
+ * This thread continuously reads user input from the keyboard
+ * and enqueues input events into the client input queue.
+ * It runs until the shared running flag becomes false.
+ *
+ * @param arg Pointer to InputThreadArgs structure
+ * @return NULL when the thread exits
+ */
 void *read_input_thread(void *arg) {
     const InputThreadArgs *args = arg;
 
@@ -759,6 +898,19 @@ void *recv_server_thread(void *arg) {
 */
 
 // improved version with poll and timeout to check running flag
+/**
+ * Thread function that receives messages from the server socket.
+ *
+ * This thread waits for incoming data on the server socket using poll(),
+ * receives complete messages, and enqueues them into the server input queue
+ * for processing by the main client thread.
+ *
+ * The thread periodically wakes up to check the running flag, allowing
+ * graceful shutdown.
+ *
+ * @param arg Pointer to ReceiveThreadArgs structure
+ * @return NULL when the thread exits
+ */
 void *recv_server_thread(void *arg) {
     const ReceiveThreadArgs *args = arg;
 
